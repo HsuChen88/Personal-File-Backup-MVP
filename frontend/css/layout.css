@@ -1,0 +1,48 @@
+/* Layout Styles - Grids and Cards */
+.main-grid {
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.main-grid.logged-in {
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+
+@media (max-width: 968px) {
+    .main-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.card {
+    background: white;
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.card.full-width {
+    grid-column: 1 / -1;
+}
+
+.logged-in-grid {
+    display: none;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+    align-items: stretch;
+}
+
+.logged-in-grid.visible {
+    display: grid;
+}
+
+@media (max-width: 968px) {
+    .logged-in-grid {
+        grid-template-columns: 1fr;
+    }
+}
+

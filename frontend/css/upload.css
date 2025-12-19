@@ -1,0 +1,215 @@
+/* Upload Section Styles */
+.upload-card {
+    position: relative;
+    min-height: 400px;
+}
+
+.upload-card.in-grid {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+}
+
+.upload-section {
+    flex: 0 0 auto;
+    min-height: 0;
+    margin-bottom: 20px;
+}
+
+.upload-section-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 20px;
+}
+
+.upload-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    backdrop-filter: blur(2px);
+}
+
+.upload-overlay.hidden {
+    display: none;
+}
+
+.upload-overlay-content {
+    text-align: center;
+    color: #6b7280;
+}
+
+.upload-overlay-content .overlay-title {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 5px;
+}
+
+.upload-overlay-content .overlay-subtitle {
+    font-size: 14px;
+}
+
+.upload-overlay-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+    opacity: 0.5;
+}
+
+.dropzone {
+    border: 3px dashed #d1d5db;
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    transition: all 0.3s;
+    cursor: pointer;
+    background: #f9fafb;
+}
+
+.dropzone.active {
+    border-color: #667eea;
+    background: #eef2ff;
+}
+
+.dropzone:hover:not(.disabled) {
+    border-color: #667eea;
+    background: #f9fafb;
+}
+
+.dropzone.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.dropzone-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+}
+
+.dropzone-text {
+    font-size: 18px;
+    color: #374151;
+    margin-bottom: 10px;
+    font-weight: 500;
+}
+
+.dropzone-subtext {
+    font-size: 14px;
+    color: #6b7280;
+}
+
+.file-input {
+    display: none;
+}
+
+/* Progress Section */
+.progress-section {
+    visibility: hidden;
+    margin-top: 30px;
+    height: 300px;
+    overflow-y: auto;
+    padding-right: 8px;
+    flex-shrink: 0;
+    flex: 0 0 300px;
+    min-height: 300px;
+    max-height: 300px;
+}
+
+.progress-section.visible {
+    visibility: visible;
+}
+
+.progress-section::-webkit-scrollbar {
+    width: 8px;
+}
+
+.progress-section::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.progress-section::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 10px;
+}
+
+.progress-section::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+.progress-section #fileList {
+    min-height: 0;
+    max-height: 100%;
+    overflow: visible;
+}
+
+.file-item {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f9fafb;
+    border-radius: 8px;
+}
+
+.file-name {
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.file-name span:first-child {
+    flex: 0 0 auto;
+}
+
+.file-name span:nth-child(2) {
+    flex: 1 1 0;
+    min-width: 0;
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.file-name span:last-child {
+    flex: 0 0 90px;
+    white-space: nowrap;
+    margin-left: auto;
+    text-align: right;
+}
+
+.progress-bar-container {
+    background: #e5e7eb;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    transition: width 0.3s;
+    border-radius: 4px;
+}
+
+.progress-text {
+    font-size: 12px;
+    color: #6b7280;
+    text-align: right;
+}
+
