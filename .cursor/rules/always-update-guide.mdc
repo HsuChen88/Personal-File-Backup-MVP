@@ -1,0 +1,4 @@
+---
+alwaysApply: true
+---
+每次更新程式版本時，也要更新guides目錄中相對應的 md 檔。
