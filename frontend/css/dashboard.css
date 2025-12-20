@@ -5,7 +5,8 @@
     height: 100%;
     min-height: 0;
     max-height: 100%;
-    overflow: hidden;
+    /* 核心修正：允許內容溢出，提示框才能浮現在卡片外 */
+    overflow: visible; 
 }
 
 .dashboard-card .section-title {
@@ -18,7 +19,11 @@
     min-height: 0;
     max-height: 100%;
     overflow-y: auto;
-    overflow-x: hidden;
+    /* 核心修正：橫向設為 visible */
+    overflow-x: visible !important;
+    /* 往下位移修正：增加上方內距讓第一行檔案往下移，給提示框留位子 */
+    padding: 55px 8px 20px 8px;   
+    margin-top: -45px;   
     padding-right: 8px;
 }
 
@@ -73,12 +78,18 @@
     border-radius: 10px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     gap: 15px;
+    /* 核心修正：每一行都需為 relative 且不裁切內容 */
+    position: relative;
+    overflow: visible !important;
+    z-index: 1;
 }
 
 .file-row:hover {
     border-color: #a5b4fc;
     box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
     transform: translateY(-2px);
+    /* 核心修正：滑鼠移入時置頂該行，防止提示框被下一行擋住 */
+    z-index: 50; 
 }
 
 .file-icon {
@@ -142,6 +153,7 @@
     gap: 10px;
     align-items: center;
     flex: 0 0 auto;
+    overflow: visible;
 }
 
 .action-btn {
@@ -160,7 +172,8 @@
     cursor: pointer;
     transition: all 0.3s;
     position: relative;
-    overflow: visible;
+    /* 核心修正：按鈕不可裁切提示框 */
+    overflow: visible !important;
 }
 
 .action-btn:hover {
@@ -227,7 +240,7 @@
     cursor: pointer;
     transition: all 0.3s;
     position: relative;
-    overflow: visible;
+    overflow: visible !important;
 }
 
 .restore-btn:hover {
@@ -237,17 +250,13 @@
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
-.restore-btn:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
-}
-
 /* Tooltip for buttons */
 .action-btn::before,
 .restore-btn::before {
     content: attr(data-tooltip);
     position: absolute;
-    bottom: calc(100% + 10px);
+    /* 核心修正：位置設為 125% 並強制高層級 */
+    bottom: 125%; 
     left: 50%;
     transform: translateX(-50%) translateY(-5px);
     background: #1f2937;
@@ -260,16 +269,15 @@
     opacity: 0;
     pointer-events: none;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 100;
+    z-index: 99999 !important; 
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    letter-spacing: 0.3px;
 }
 
 .action-btn::after,
 .restore-btn::after {
     content: '';
     position: absolute;
-    bottom: calc(100% + 3px);
+    bottom: 110%;
     left: 50%;
     transform: translateX(-50%) translateY(-5px);
     border: 7px solid transparent;
@@ -277,7 +285,7 @@
     opacity: 0;
     pointer-events: none;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 100;
+    z-index: 99999 !important;
 }
 
 .action-btn:hover::before,
@@ -338,4 +346,3 @@
         margin-left: auto;
     }
 }
-
