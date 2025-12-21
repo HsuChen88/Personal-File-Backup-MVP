@@ -13,6 +13,7 @@ const AppState = {
     ],
     
     currentRestoreFile: null,
+    currentShareFile: null,
 
     // --- 設定狀態的方法 ---
     setLoggedIn(value, email = null) {
@@ -44,5 +45,13 @@ const AppState = {
 
     clearCurrentRestoreFile() {
         this.currentRestoreFile = null;
+    },
+
+    setCurrentShareFile(file) {
+        this.currentShareFile = file;
+    },
+
+    clearCurrentShareFile() {
+        this.currentShareFile = null;
     }
 };

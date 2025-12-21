@@ -328,3 +328,19 @@
     font-size: 20px;
 }
 
+/* Share Modal Form */
+.share-form {
+    text-align: left;
+    margin-bottom: 20px;
+}
+
+.share-form .form-group {
+    margin-bottom: 20px;
+}
+
+.share-form textarea.form-input {
+    resize: vertical;
+    min-height: 80px;
+    font-family: inherit;
+}
+
