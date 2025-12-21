@@ -55,20 +55,33 @@ function renderFileDashboard() {
 }
 
 /**
- * Handle download file action
- * @param {number} fileId - File ID
+ * 真實 S3 下載：產生 Pre-signed URL 並觸發瀏覽器下載
  */
-function handleDownloadFile(fileId) {
+async function handleDownloadFile(fileId) {
     const file = AppState.getFileById(fileId);
     if (!file) return;
 
-    showToast('⬇️', `Downloading ${file.name}...`);
-    
-    // Simulate download process
-    setTimeout(() => {
-        showToast('✅', `${file.name} downloaded successfully!`);
-        // In real implementation: Generate pre-signed S3 URL and trigger download
-    }, 1500);
+    showToast('⬇️', `正在產生 ${file.name} 的下載連結...`);
+
+    const s3 = new AWS.S3();
+    const params = {
+        Bucket: AWS_CONFIG.s3BucketName,
+        Key: `uploads/${file.name}`,
+        Expires: 60 // 連結 60 秒後過期
+    };
+
+    try {
+        const url = await s3.getSignedUrlPromise('getObject', params);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showToast('✅', '下載已開始');
+    } catch (err) {
+        showToast('❌', '下載失敗：' + err.message);
+    }
 }
 
 /**
@@ -89,32 +102,29 @@ function handleShareFile(fileId) {
 }
 
 /**
- * Handle delete file action
- * @param {number} fileId - File ID
+ * 真實 S3 刪除：從 Bucket 中移除檔案
  */
-function handleDeleteFile(fileId) {
+async function handleDeleteFile(fileId) {
     const file = AppState.getFileById(fileId);
-    if (!file) return;
+    if (!file || !confirm(`確定要永久刪除 "${file.name}" 嗎？`)) return;
 
-    // Show confirmation with more details
-    const confirmMessage = `Delete "${file.name}"?\n\n` +
-        `The file will be moved to deleted status and can be restored within the retention period.\n\n` +
-        `Size: ${formatFileSize(file.size)}\n` +
-        `Date: ${file.date}`;
+    showToast('🗑️', `正在從 S3 刪除檔案...`);
 
-    if (confirm(confirmMessage)) {
-        showToast('🗑️', `Deleting ${file.name}...`);
+    const s3 = new AWS.S3();
+    const params = {
+        Bucket: AWS_CONFIG.s3BucketName,
+        Key: `uploads/${file.name}`
+    };
+
+    try {
+        await s3.deleteObject(params).promise();
         
-        // Simulate delete process
-        setTimeout(() => {
-            // Update file status
-            const backupDate = new Date().toISOString().replace('T', ' ').substring(0, 16);
-            AppState.updateFileStatus(fileId, 'deleted', backupDate);
-            
-            renderFileDashboard();
-            showToast('✅', `${file.name} has been deleted!`);
-            // In real implementation: Update DynamoDB, move to backup vault
-        }, 1000);
+        // 更新 UI 狀態
+        AppState.updateFileStatus(fileId, 'deleted');
+        renderFileDashboard();
+        showToast('✅', '檔案已從雲端刪除');
+    } catch (err) {
+        showToast('❌', '刪除失敗：' + err.message);
     }
 }
 

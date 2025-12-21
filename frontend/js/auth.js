@@ -5,51 +5,45 @@
  */
 
 /**
- * Switch between login and register tabs
- * 切換登入與註冊分頁
- * @param {string} tab - 'login' or 'register'
+ * [新增] 檢查當前 Session (網頁載入時執行)
+ * 這會讓 F5 重新整理後，依然保持登入狀態
  */
-function switchTab(tab) {
-    const tabs = document.querySelectorAll('.auth-tab');
-    const forms = document.querySelectorAll('.auth-form');
-    const loginForm = document.getElementById('loginForm');
-    const registerForm = document.getElementById('registerForm');
-    const confirmSection = document.getElementById('confirmSection');
+function checkCurrentSession() {
+    console.log("🔍 Checking session...");
+    const idToken = localStorage.getItem('idToken');
+    
+    if (idToken) {
+        try {
+            // 解析 JWT 取得使用者 Email (Payload 是 Base64 編碼的 JSON)
+            const payload = JSON.parse(atob(idToken.split('.')[1]));
+            const email = payload.email;
 
-    // 如果正在顯示驗證區塊，鎖定分頁標籤，不切換內容以防找不到輸入框
-    if (confirmSection && confirmSection.style.display === 'block') {
-        tabs.forEach(t => t.classList.remove('active'));
-        if (tab === 'login') tabs[0].classList.add('active');
-        else tabs[1].classList.add('active');
-        return; 
-    }
+            // 恢復全域狀態
+            if (typeof AppState !== 'undefined') {
+                // 呼叫 state.js 的方法設定狀態
+                if (typeof AppState.setLoggedIn === 'function') {
+                    AppState.setLoggedIn(true, email);
+                } else {
+                    // 相容舊版寫法
+                    AppState.isLoggedIn = true;
+                    AppState.currentUserEmail = email;
+                }
+                console.log("✅ Session restored for:", email);
+            }
 
-    tabs.forEach(t => t.classList.remove('active'));
-    forms.forEach(f => f.classList.remove('active'));
-
-    // 確保切換時隱藏所有區塊
-    if (loginForm) loginForm.style.display = 'none';
-    if (registerForm) registerForm.style.display = 'none';
-    if (confirmSection) confirmSection.style.display = 'none';
-
-    if (tab === 'login') {
-        tabs[0].classList.add('active');
-        if (loginForm) {
-            loginForm.classList.add('active');
-            loginForm.style.display = 'block';
+            // 更新 UI 顯示為已登入狀態
+            switchToLoggedInLayout(email);
+        } catch (e) {
+            console.error("Session restore failed (Token invalid):", e);
+            handleLogout(); // Token 有問題，強制登出
         }
     } else {
-        tabs[1].classList.add('active');
-        if (registerForm) {
-            registerForm.classList.add('active');
-            registerForm.style.display = 'block';
-        }
+        console.log("ℹ️ No active session found.");
     }
 }
 
 /**
  * Handle Login Form Submission
- * 處理登入表單提交
  */
 function handleLoginSubmit(event) {
     event.preventDefault();
@@ -79,16 +73,26 @@ function handleLoginSubmit(event) {
 
     cognitoUser.authenticateUser(authenticationDetails, {
         onSuccess: function (result) {
-            // 獲取 ID Token 並儲存，供後續 API 調用使用
             const idToken = result.getIdToken().getJwtToken();
             localStorage.setItem('idToken', idToken);
             
+            // 登入成功，立即更新全域狀態
+            if (typeof AppState !== 'undefined') {
+                if (typeof AppState.setLoggedIn === 'function') {
+                    AppState.setLoggedIn(true, email);
+                } else {
+                    AppState.isLoggedIn = true;
+                    AppState.currentUserEmail = email;
+                }
+            }
+
             showToast('✅', 'Successfully logged in!');
             switchToLoggedInLayout(email);
             btn.disabled = false;
             btn.textContent = 'Login';
         },
         onFailure: function (err) {
+            console.error("Login failed:", err);
             showToast('❌', err.message || 'Login failed');
             btn.disabled = false;
             btn.textContent = 'Login';
@@ -98,7 +102,6 @@ function handleLoginSubmit(event) {
 
 /**
  * Handle Register Form Submission
- * 處理註冊表單提交
  */
 function handleRegisterSubmit(e) {
     e.preventDefault();
@@ -108,7 +111,6 @@ function handleRegisterSubmit(e) {
     const confirmPassword = document.getElementById('registerConfirmPassword').value;
     const btn = document.getElementById('registerSubmitBtn');
 
-    // 1. 基本前端驗證
     if (password !== confirmPassword) {
         showToast('❌', 'Passwords do not match');
         return;
@@ -117,23 +119,17 @@ function handleRegisterSubmit(e) {
     btn.disabled = true;
     btn.textContent = 'Processing...';
 
-    // 2. 初始化 Cognito UserPool
     const poolData = {
         UserPoolId: AWS_CONFIG.userPoolId,
         ClientId: AWS_CONFIG.appClientId
     };
     const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
-
-    // 3. 設定必要屬性 (Email)
     const attributeList = [new AmazonCognitoIdentity.CognitoUserAttribute({ Name: 'email', Value: email })];
 
-    // 4. 執行註冊
     userPool.signUp(email, password, attributeList, null, function(err, result) {
         if (err) {
-            // --- 關鍵修正：偵測帳號已存在錯誤 ---
             if (err.code === 'UsernameExistsException') {
                 showToast('ℹ️', 'Account exists. Redirecting to verification...');
-                // 直接調用顯示驗證畫面的函數
                 showConfirmSection(email);
             } else {
                 showToast('❌', err.message || 'Registration failed'); 
@@ -143,7 +139,6 @@ function handleRegisterSubmit(e) {
             return;
         }
         
-        // 正常註冊成功流程
         showToast('📧', 'Code sent to your email!');
         showConfirmSection(email);
 
@@ -153,8 +148,7 @@ function handleRegisterSubmit(e) {
 }
 
 /**
- * Handle Account Verification (Confirm Registration)
- * 處理驗證碼確認
+ * Handle Account Verification
  */
 function handleConfirmRegistration() {
     const email = document.getElementById('registerEmail').value.trim();
@@ -185,7 +179,6 @@ function handleConfirmRegistration() {
         }
         
         showToast('✅', 'Account confirmed! You can now login.');
-        // 驗證成功，隱藏驗證區塊並切換回登入分頁
         document.getElementById('confirmSection').style.display = 'none';
         switchTab('login');
         
@@ -194,10 +187,6 @@ function handleConfirmRegistration() {
     });
 }
 
-/**
- * Resend Verification Code
- * 重發驗證碼
- */
 function resendCode() {
     const email = document.getElementById('registerEmail').value.trim();
     if (!email) {
@@ -221,10 +210,6 @@ function resendCode() {
     });
 }
 
-/**
- * Back to Registration Form
- * 從驗證畫面返回註冊表單
- */
 function handleBackToRegistration() {
     document.getElementById('confirmSection').style.display = 'none';
     document.getElementById('registerForm').style.display = 'block';
@@ -233,9 +218,12 @@ function handleBackToRegistration() {
 
 /**
  * Handle Logout
- * 處理登出
  */
 function handleLogout() {
+    // 1. 清除 LocalStorage
+    localStorage.removeItem('idToken'); 
+
+    // 2. 清除 Cognito SDK 狀態
     const poolData = { UserPoolId: AWS_CONFIG.userPoolId, ClientId: AWS_CONFIG.appClientId };
     const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
     const cognitoUser = userPool.getCurrentUser();
@@ -244,63 +232,123 @@ function handleLogout() {
         cognitoUser.signOut();
     }
 
-    localStorage.removeItem('idToken'); // 清除 Token
+    // 3. 重置 AppState
+    if (typeof AppState !== 'undefined') {
+        if (typeof AppState.setLoggedIn === 'function') {
+            AppState.setLoggedIn(false, null);
+        } else {
+            AppState.isLoggedIn = false;
+            AppState.currentUserEmail = null;
+        }
+        console.log("✅ AppState Reset: User Logged Out");
+    }
 
-    // 切換回登入佈局
+    // 4. 重置 UI
     switchToLoginLayout();
-
-    // 重置表單內容
-    document.getElementById('loginForm').reset();
-    document.getElementById('registerForm').reset();
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    if (loginForm) loginForm.reset();
+    if (registerForm) registerForm.reset();
 
     showToast('✅', 'Logged out successfully');
 }
 
 /**
- * Switch to logged in layout
- * 切換至登入後佈局
- * @param {string} email - User email
+ * UI Switching Logic
  */
+
+function switchTab(tab) {
+    const tabs = document.querySelectorAll('.auth-tab');
+    const forms = document.querySelectorAll('.auth-form');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const confirmSection = document.getElementById('confirmSection');
+
+    // 如果正在顯示驗證區塊，鎖定分頁標籤
+    if (confirmSection && confirmSection.style.display === 'block') {
+        tabs.forEach(t => t.classList.remove('active'));
+        if (tab === 'login') tabs[0].classList.add('active');
+        else tabs[1].classList.add('active');
+        return; 
+    }
+
+    tabs.forEach(t => t.classList.remove('active'));
+    forms.forEach(f => f.classList.remove('active'));
+
+    if (loginForm) loginForm.style.display = 'none';
+    if (registerForm) registerForm.style.display = 'none';
+    if (confirmSection) confirmSection.style.display = 'none';
+
+    if (tab === 'login') {
+        if(tabs[0]) tabs[0].classList.add('active');
+        if (loginForm) {
+            loginForm.classList.add('active');
+            loginForm.style.display = 'block';
+        }
+    } else {
+        if(tabs[1]) tabs[1].classList.add('active');
+        if (registerForm) {
+            registerForm.classList.add('active');
+            registerForm.style.display = 'block';
+        }
+    }
+}
+
 function switchToLoggedInLayout(email) {
-    // 隱藏身分驗證卡片與登入前之上傳卡片
     const authCard = document.getElementById('authCard');
     if (authCard) authCard.style.display = 'none';
     
     const beforeLoginCard = document.getElementById('uploadCardBeforeLogin');
     if (beforeLoginCard) beforeLoginCard.style.display = 'none';
     
-    // 顯示狀態列
     const statusBar = document.getElementById('statusBar');
-    if (statusBar) statusBar.classList.add('visible');
-    document.getElementById('statusBarEmail').textContent = email;
+    if (statusBar) {
+        statusBar.classList.add('visible');
+    }
+    const emailSpan = document.getElementById('statusBarEmail');
+    if (emailSpan) emailSpan.textContent = email;
     
-    // 顯示登入後的功能區 (上傳 + 儀表板)
     const loggedInGrid = document.getElementById('loggedInGrid');
     if (loggedInGrid) loggedInGrid.classList.add('visible');
     
-    // 渲染儀表板檔案列表 (假設此函數定義在 dashboard.js)
+    // 雙重保險：切換介面時再次確認狀態正確
+    if (typeof AppState !== 'undefined') {
+        if (typeof AppState.setLoggedIn === 'function') {
+            if (!AppState.isLoggedIn) AppState.setLoggedIn(true, email);
+        } else {
+            AppState.isLoggedIn = true;
+            AppState.currentUserEmail = email;
+        }
+    }
+
     if (typeof renderFileDashboard === 'function') {
         renderFileDashboard();
     }
 }
 
-/**
- * Switch back to login layout
- * 切換回登入前佈局
- */
 function switchToLoginLayout() {
-    // 顯示身分驗證卡片與登入前之上傳卡片
     const authCard = document.getElementById('authCard');
     if (authCard) authCard.style.display = 'block';
     
     const beforeLoginCard = document.getElementById('uploadCardBeforeLogin');
     if (beforeLoginCard) beforeLoginCard.style.display = 'block';
     
-    // 隱藏狀態列
     const statusBar = document.getElementById('statusBar');
     if (statusBar) statusBar.classList.remove('visible');
     
-    // 隱藏登入後的功能區
     const loggedInGrid = document.getElementById('loggedInGrid');
     if (loggedInGrid) loggedInGrid.classList.remove('visible');
+}
+
+function showConfirmSection(email) {
+    const forms = document.querySelectorAll('.auth-form');
+    forms.forEach(f => f.style.display = 'none');
+    
+    const confirmSection = document.getElementById('confirmSection');
+    if (confirmSection) {
+        confirmSection.style.display = 'block';
+        confirmSection.classList.add('active');
+    }
+    const emailInput = document.getElementById('registerEmail');
+    if (emailInput) emailInput.value = email;
 }
