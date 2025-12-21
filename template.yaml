@@ -30,9 +30,184 @@ Resources:
             AllowedOrigins: ['*']
             ExposedHeaders: [ETag, x-amz-meta-custom-header]
             MaxAge: 3000
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: alias/aws/s3
+      PublicAccessBlockConfiguration:
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  StorageBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref StorageBucket
+      PolicyDocument:
+        Id: RequireEncryptionInTransit
+        Version: '2012-10-17'
+        Statement:
+          - Principal: '*'
+            Action: '*'
+            Effect: Deny
+            Resource:
+              - !GetAtt StorageBucket.Arn
+              - !Sub ${StorageBucket.Arn}/*
 
   # ==========================================
-  # 2. Lambda - Groq AI 摘要生成器 (Python)
+  # 2. API Gateway - REST API
+  # ==========================================
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub ${AppName}-api
+      StageName: Prod
+      DefinitionBody:
+        openapi: '3.0'
+        info: {}
+        paths:
+          /request-upload:
+            post:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RequestUploadHandler.Arn}/invocations
+              responses: {}
+          /share-file:
+            post:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ShareFileHandler.Arn}/invocations
+              responses: {}
+          /subscribe-email:
+            post:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SubscribeEmailHandler.Arn}/invocations
+              responses: {}
+      EndpointConfiguration: REGIONAL
+      TracingEnabled: true
+      Cors:
+        AllowMethods: "'POST,OPTIONS'"
+        AllowHeaders: "'Content-Type'"
+        AllowOrigin: "'*'"
+
+  # ==========================================
+  # 3. Lambda - Request Upload Handler
+  # ==========================================
+  RequestUploadHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/RequestUploadHandler
+      Handler: index.handler
+      Runtime: nodejs22.x
+      MemorySize: 256
+      Timeout: 10
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref StorageBucket
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Ref StorageBucket
+      Events:
+        ApiPOSTrequestupload:
+          Type: Api
+          Properties:
+            Path: /request-upload
+            Method: POST
+            RestApiId: !Ref Api
+
+  RequestUploadHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${RequestUploadHandler}
+      RetentionInDays: 30
+
+  # ==========================================
+  # 4. Lambda - Share File Handler
+  # ==========================================
+  ShareFileHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/ShareFileHandler
+      Handler: index.handler
+      Runtime: nodejs22.x
+      MemorySize: 256
+      Timeout: 10
+      Tracing: Active
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref SNSTopic
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref SNSTopic
+      Events:
+        ApiPOSTsharefile:
+          Type: Api
+          Properties:
+            Path: /share-file
+            Method: POST
+            RestApiId: !Ref Api
+
+  ShareFileHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${ShareFileHandler}
+      RetentionInDays: 30
+
+  # ==========================================
+  # 5. Lambda - Subscribe Email Handler
+  # ==========================================
+  SubscribeEmailHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/SubscribeEmailHandler
+      Handler: index.handler
+      Runtime: nodejs22.x
+      MemorySize: 256
+      Timeout: 10
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref SNSTopic
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sns:Subscribe
+              Resource: !Ref SNSTopic
+      Events:
+        ApiPOSTsubscribeemail:
+          Type: Api
+          Properties:
+            Path: /subscribe-email
+            Method: POST
+            RestApiId: !Ref Api
+
+  SubscribeEmailHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${SubscribeEmailHandler}
+      RetentionInDays: 30
+
+  # ==========================================
+  # 6. SNS Topic - 通知服務
+  # ==========================================
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub ${AppName}-notifications
+      DisplayName: Dropbex Notifications
+
+  # ==========================================
+  # 7. Lambda - Groq AI 摘要生成器 (Python)
   # ==========================================
   SummaryFunction:
     Type: AWS::Serverless::Function
@@ -64,7 +239,7 @@ Resources:
                     Value: uploads/
 
   # ==========================================
-  # 3. Cognito - 使用者驗證系統
+  # 8. Cognito - 使用者驗證系統
   # ==========================================
   UserPool:
     Type: AWS::Cognito::UserPool
@@ -90,7 +265,7 @@ Resources:
           ProviderName: !GetAtt UserPool.ProviderName
 
   # ==========================================
-  # 4. IAM Role - 授權前端 JS 直接存取 S3
+  # 9. IAM Role - 授權前端 JS 直接存取 S3
   # ==========================================
   CognitoAuthRole:
     Type: AWS::IAM::Role
@@ -128,7 +303,7 @@ Resources:
         authenticated: !GetAtt CognitoAuthRole.Arn
 
 # ==========================================
-# 5. 輸出結果 (部署完後請複製到 js/config.js)
+# Outputs - 輸出結果 (部署完後請複製到 js/config.js)
 # ==========================================
 Outputs:
   Region:
@@ -141,3 +316,9 @@ Outputs:
     Value: !Ref UserPoolClient
   IdentityPoolId:
     Value: !Ref IdentityPool
+  ApiEndpoint:
+    Value: !Sub https://${Api}.execute-api.${AWS::Region}.amazonaws.com/Prod
+    Description: API Gateway endpoint URL
+  SNSTopicArn:
+    Value: !Ref SNSTopic
+    Description: SNS Topic ARN for notifications
