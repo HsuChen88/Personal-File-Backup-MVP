@@ -22,6 +22,9 @@
     border-radius: 16px;
     padding: 40px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    /* 核心修正：確保卡片容器本身不裁切內容 */
+    position: relative;
+    overflow: visible !important;
 }
 
 .card.full-width {
@@ -38,6 +41,7 @@
 
 .logged-in-grid.visible {
     display: grid;
+    overflow: visible !important;
 }
 
 @media (max-width: 968px) {

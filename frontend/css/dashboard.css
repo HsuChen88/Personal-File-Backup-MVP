@@ -1,11 +1,14 @@
-/* Dashboard Styles */
+/* Dashboard Styles - 完整修正版 */
+
+/* 1. 卡片容器設定 */
 .dashboard-card {
     display: flex;
     flex-direction: column;
     height: 100%;
     min-height: 0;
     max-height: 100%;
-    overflow: hidden;
+    /* 關鍵：允許 Tooltip 超出卡片邊界顯示 */
+    overflow: visible; 
 }
 
 .dashboard-card .section-title {
@@ -13,33 +16,36 @@
     min-height: 0;
 }
 
+/* 2. 檔案列表區域 */
 .dashboard-card .file-list {
     flex: 1 1 0;
     min-height: 0;
     max-height: 100%;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding-right: 8px;
+    overflow-y: auto; /* 保留垂直捲動 */
+    overflow-x: visible; /* 讓 Tooltip 水平方向不被裁切 */
+    
+    /* 修正內距，讓第一筆資料有空間顯示上方的 Tooltip */
+    padding: 35px 8px 20px 8px;   
+    margin-top: 0;   
 }
 
+/* 捲軸美化 */
 .dashboard-card .file-list::-webkit-scrollbar {
     width: 8px;
 }
-
 .dashboard-card .file-list::-webkit-scrollbar-track {
     background: #f1f1f1;
     border-radius: 10px;
 }
-
 .dashboard-card .file-list::-webkit-scrollbar-thumb {
     background: #d1d5db;
     border-radius: 10px;
 }
-
 .dashboard-card .file-list::-webkit-scrollbar-thumb:hover {
     background: #9ca3af;
 }
 
+/* 3. 標題區域 */
 .section-title {
     font-size: 18px;
     font-weight: 600;
@@ -58,6 +64,7 @@
     color: #6b7280;
 }
 
+/* 4. 檔案列表項目 */
 .file-list {
     display: flex;
     flex-direction: column;
@@ -71,14 +78,20 @@
     background: #fff;
     border: 1px solid #e5e7eb;
     border-radius: 10px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s ease;
     gap: 15px;
+    /* 關鍵：設定相對定位，但不隱藏溢出內容 */
+    position: relative;
+    overflow: visible !important;
+    z-index: 1;
 }
 
 .file-row:hover {
     border-color: #a5b4fc;
     box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
     transform: translateY(-2px);
+    /* 滑鼠移入時提高層級，確保 Tooltip 蓋過下方的檔案 */
+    z-index: 100; 
 }
 
 .file-icon {
@@ -96,22 +109,16 @@
     font-weight: 500;
     color: #1f2937;
     font-size: 15px;
-    max-width: 100%;
     word-wrap: break-word;
-    word-break: break-word;
-    overflow-wrap: break-word;
 }
 
 .file-meta {
     font-size: 13px;
     color: #6b7280;
     margin-top: 2px;
-    max-width: 100%;
-    word-wrap: break-word;
-    word-break: break-word;
-    overflow-wrap: break-word;
 }
 
+/* 狀態標籤 */
 .file-status {
     padding: 4px 12px;
     border-radius: 20px;
@@ -120,23 +127,11 @@
     flex: 0 0 auto;
     white-space: nowrap;
 }
+.status-normal { background: #ecfdf5; color: #059669; }
+.status-deleted { background: #fef2f2; color: #dc2626; }
+.status-expired { background: #f3f4f6; color: #6b7280; }
 
-.status-normal {
-    background: #ecfdf5;
-    color: #059669;
-}
-
-.status-deleted {
-    background: #fef2f2;
-    color: #dc2626;
-}
-
-.status-expired {
-    background: #f3f4f6;
-    color: #6b7280;
-}
-
-/* File Action Buttons */
+/* 5. 按鈕與 Tooltip (核心修正區) */
 .file-actions {
     display: flex;
     gap: 10px;
@@ -144,6 +139,7 @@
     flex: 0 0 auto;
 }
 
+/* 通用按鈕樣式 */
 .action-btn {
     display: inline-flex;
     align-items: center;
@@ -158,184 +154,80 @@
     font-weight: 500;
     font-size: 18px;
     cursor: pointer;
-    transition: all 0.3s;
-    position: relative;
-    overflow: visible;
+    transition: all 0.2s;
+    /* 關鍵：作為 Tooltip 的定位基準點 */
+    position: relative; 
 }
 
 .action-btn:hover {
-    background: #667eea;
-    color: white;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
-.action-btn:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
-}
+/* 個別顏色設定 */
+.action-btn.download { border-color: #3b82f6; color: #3b82f6; }
+.action-btn.download:hover { background: #3b82f6; color: white; }
 
-.action-btn.download {
-    border-color: #3b82f6;
-    color: #3b82f6;
-}
+.action-btn.share { border-color: #10b981; color: #10b981; }
+.action-btn.share:hover { background: #10b981; color: white; }
 
-.action-btn.download:hover {
-    background: #3b82f6;
-    border-color: #3b82f6;
-    color: white;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-}
+.action-btn.delete { border-color: #ef4444; color: #ef4444; }
+.action-btn.delete:hover { background: #ef4444; color: white; }
 
-.action-btn.share {
-    border-color: #10b981;
-    color: #10b981;
-}
 
-.action-btn.share:hover {
-    background: #10b981;
-    border-color: #10b981;
-    color: white;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
-}
+/* --- ✨ Tooltip 完美修正版 ✨ --- */
 
-.action-btn.delete {
-    border-color: #ef4444;
-    color: #ef4444;
-}
-
-.action-btn.delete:hover {
-    background: #ef4444;
-    border-color: #ef4444;
-    color: white;
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
-}
-
-.restore-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    background: white;
-    border: 2px solid #667eea;
-    color: #667eea;
-    border-radius: 8px;
-    font-weight: 500;
-    font-size: 18px;
-    cursor: pointer;
-    transition: all 0.3s;
-    position: relative;
-    overflow: visible;
-}
-
-.restore-btn:hover {
-    background: #667eea;
-    color: white;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-}
-
-.restore-btn:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
-}
-
-/* Tooltip for buttons */
-.action-btn::before,
-.restore-btn::before {
+/* Tooltip 本體 (黑色框框) */
+.action-btn[data-tooltip]:hover::after {
     content: attr(data-tooltip);
     position: absolute;
-    bottom: calc(100% + 10px);
+    bottom: 100%;       /* 位於按鈕正上方 */
     left: 50%;
-    transform: translateX(-50%) translateY(-5px);
-    background: #1f2937;
+    transform: translateX(-50%);
+    
+    background-color: #1f2937; /* 深黑色 */
     color: white;
-    padding: 8px 14px;
-    border-radius: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     white-space: nowrap;
+    
     opacity: 0;
     pointer-events: none;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 100;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    letter-spacing: 0.3px;
+    margin-bottom: 8px; /* 抬高一點，留空間給箭頭 */
+    z-index: 1000;
+    animation: fadeIn 0.2s forwards;
 }
 
-.action-btn::after,
-.restore-btn::after {
+/* Tooltip 箭頭 (小三角形) */
+.action-btn[data-tooltip]:hover::before {
     content: '';
     position: absolute;
-    bottom: calc(100% + 3px);
+    bottom: 100%;
     left: 50%;
-    transform: translateX(-50%) translateY(-5px);
-    border: 7px solid transparent;
-    border-top-color: #1f2937;
+    transform: translateX(-50%);
+    
+    /* 畫出倒三角形 */
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid #1f2937; /* 顏色需與框框一致 */
+    
     opacity: 0;
     pointer-events: none;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 100;
+    margin-bottom: 2px; /* 微調位置，讓它接在框框下面 */
+    z-index: 1000;
+    animation: fadeIn 0.2s forwards;
 }
 
-.action-btn:hover::before,
-.action-btn:hover::after,
-.restore-btn:hover::before,
-.restore-btn:hover::after {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
+/* 簡單的淡入動畫 */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(5px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
-.action-btn:hover::before,
-.restore-btn:hover::before {
-    animation: tooltipBounce 0.4s ease-out;
-}
-
-@keyframes tooltipBounce {
-    0% {
-        transform: translateX(-50%) translateY(-5px);
-        opacity: 0;
-    }
-    60% {
-        transform: translateX(-50%) translateY(2px);
-    }
-    100% {
-        transform: translateX(-50%) translateY(0);
-        opacity: 1;
-    }
-}
-
+/* RWD 設定 */
 @media (max-width: 768px) {
-    .file-actions {
-        gap: 8px;
-    }
-
-    .action-btn,
-    .restore-btn {
-        width: 36px;
-        height: 36px;
-        font-size: 16px;
-    }
-
-    .file-row {
-        padding: 12px;
-    }
+    .action-btn { width: 36px; height: 36px; font-size: 16px; }
+    .file-row { padding: 12px; }
 }
-
-@media (max-width: 480px) {
-    .file-row {
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .file-info {
-        flex: 1 1 100%;
-    }
-
-    .file-actions {
-        margin-left: auto;
-    }
-}
-
