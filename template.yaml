@@ -3,19 +3,6 @@
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub ${AWS::StackName}-bucket-${AWS::AccountId}
-      CorsConfiguration:
-        CorsRules:
-          - AllowedHeaders:
-              - "*"
-            AllowedMethods:
-              - GET
-              - PUT
-              - POST
-              - DELETE
-              - HEAD
-            AllowedOrigins:
-              - "*"  # 測試環境允許所有來源，這能解決本地 index.html 的問題
-            MaxAge: 3000
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
@@ -74,7 +61,6 @@
       CodeUri: src/RequestUploadHandler
       Handler: index.handler
       Runtime: nodejs22.x
-      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/LabRole
       MemorySize: 256
       Timeout: 10
       Tracing: Active
@@ -104,10 +90,3 @@
       LogGroupName: !Sub /aws/lambda/${RequestUploadHandler}
       RetentionInDays: 30
 Transform: AWS::Serverless-2016-10-31
-Outputs:
-  ApiUrl:
-    Description: "API Gateway endpoint URL"
-    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
-  BucketName:
-    Description: "S3 Bucket Name"
-    Value: !Ref Bucket

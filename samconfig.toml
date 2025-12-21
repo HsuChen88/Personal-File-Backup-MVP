@@ -1,28 +1,39 @@
 version = 0.1
 
+# ============================================================================
+# AWS SAM 配置檔案 (samconfig.toml)
+# ============================================================================
+# 此檔案包含 SAM 部署的共用設定，應該提交到版本控制系統。
+# 所有團隊成員共享相同的部署配置（如 region, stack_name）。
+# 
+# 個人化的 AWS 認證資訊應透過 `aws configure` 設定，不應放在此檔案中。
+# 部署後的資源資訊（如 API Gateway URL）應放在個人的 .env 檔案中。
+# ============================================================================
 
 [default]
 [default.global.parameters]
-
+# Stack 名稱：所有團隊成員共用，但每個人在自己的 AWS 帳號中會建立獨立的 Stack
 stack_name = "dropbex-mvp"
 
-
+# AWS 區域：所有團隊成員共用
 region = "us-east-1"
 
 [default.deploy.parameters]
+# 部署區域（應與 global.parameters.region 一致）
+region = "us-east-1"
 
-
+# 在部署前確認變更集（建議保持為 true，避免意外變更）
 confirm_changeset = true
 
-
+# IAM 權限：允許 SAM 建立 IAM 角色（Lambda 函數需要）
 capabilities = "CAPABILITY_IAM"
 
-
+# 自動解析 S3 bucket 用於存放部署套件
 resolve_s3 = true
 
-
+# S3 prefix：用於組織部署套件
 s3_prefix = "dropbex-mvp"
 
+# 容器映像儲存庫（此專案不使用容器，保持為空）
 image_repositories = []
-disable_rollback = true
 

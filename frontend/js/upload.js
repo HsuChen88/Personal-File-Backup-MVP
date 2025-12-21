@@ -5,15 +5,11 @@
 
 /**
  * Handle drag over event
+ * @param {Event} e - Drag event
  */
 function handleDragOver(e) {
     e.preventDefault();
-    console.log("🔥 Drag Over event detected"); // Debug
-
-    if (!AppState.isLoggedIn) {
-        // 不回傳 return，讓使用者至少能看到禁止符號，或者除錯時能看到 log
-        return;
-    }
+    if (!AppState.isLoggedIn) return;
     
     const dropzone = document.getElementById('dropzone');
     if (dropzone) {
@@ -23,6 +19,7 @@ function handleDragOver(e) {
 
 /**
  * Handle drag leave event
+ * @param {Event} e - Drag event
  */
 function handleDragLeave(e) {
     e.preventDefault();
@@ -34,16 +31,11 @@ function handleDragLeave(e) {
 
 /**
  * Handle drop event
+ * @param {Event} e - Drop event
  */
 function handleDrop(e) {
     e.preventDefault();
-    console.log("🔥 Drop event detected"); // Debug
-
-    if (!AppState.isLoggedIn) {
-        console.warn("⚠️ User not logged in, upload aborted.");
-        alert("請先登入後再上傳檔案！(AppState.isLoggedIn is false)");
-        return;
-    }
+    if (!AppState.isLoggedIn) return;
 
     const dropzone = document.getElementById('dropzone');
     if (dropzone) {
@@ -51,44 +43,34 @@ function handleDrop(e) {
     }
     
     const files = Array.from(e.dataTransfer.files);
-    console.log("📂 Files dropped:", files); // Debug
     processFiles(files);
 }
 
 /**
  * Handle file select from input
+ * @param {Event} e - File input change event
  */
 function handleFileSelect(e) {
-    console.log("🔥 File Input Changed"); // Debug
-
-    if (!AppState.isLoggedIn) {
-        console.warn("⚠️ User not logged in.");
-        alert("請先登入後再上傳檔案！");
-        return;
-    }
-
+    if (!AppState.isLoggedIn) return;
     const files = Array.from(e.target.files);
-    console.log("📂 Files selected:", files); // Debug
     processFiles(files);
 }
 
 /**
  * Process selected files for upload
+ * @param {File[]} files - Array of file objects
  */
 function processFiles(files) {
     const progressSection = document.getElementById('progressSection');
     const fileList = document.getElementById('fileList');
 
-    if (!progressSection || !fileList) {
-        console.error("❌ Error: progressSection or fileList DOM element not found!");
-        return;
-    }
+    if (!progressSection || !fileList) return;
 
     progressSection.classList.add('visible');
 
     files.forEach(file => {
-        const fileId = generateFileId(); // 確保 utils.js 有載入
-        const fileIcon = typeof getFileIcon === 'function' ? getFileIcon(file.name) : '📄';
+        const fileId = generateFileId();
+        const fileIcon = getFileIcon(file.name);
 
         const fileItem = document.createElement('div');
         fileItem.className = 'file-item';
@@ -102,107 +84,52 @@ function processFiles(files) {
             <div class="progress-bar-container">
                 <div class="progress-bar" style="width: 0%"></div>
             </div>
-            <div class="progress-text">Waiting...</div>
+            <div class="progress-text">Uploading... 0%</div>
         `;
 
         fileList.appendChild(fileItem);
 
-        // 呼叫上傳函數
-        console.log(`🚀 Starting upload for: ${file.name}`);
+        // Simulate upload (replace with actual S3 upload)
         uploadFile(file, fileId);
     });
 }
 
 /**
- * Upload a single file to S3
+ * Upload a single file
+ * @param {File} file - File object to upload
+ * @param {string} fileId - Unique identifier for the file item
  */
 function uploadFile(file, fileId) {
     const progressBar = document.querySelector(`#${fileId} .progress-bar`);
     const progressText = document.querySelector(`#${fileId} .progress-text`);
 
-    // 1. 檢查 AWS SDK 是否載入
-    if (typeof AWS === 'undefined') {
-        console.error("❌ AWS SDK not loaded! Check index.html script order.");
-        if(progressText) {
-            progressText.textContent = "Error: AWS SDK missing";
-            progressText.style.color = 'red';
-        }
-        return;
-    }
+    if (!progressBar || !progressText) return;
 
-    // 2. 檢查 Config
-    if (typeof AWS_CONFIG === 'undefined') {
-        console.error("❌ AWS_CONFIG not found! Check config.js.");
-        return;
-    }
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress > 100) progress = 100;
 
-    // 3. 配置 AWS 憑證
-    try {
-        AWS.config.region = AWS_CONFIG.region;
-        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-            IdentityPoolId: AWS_CONFIG.identityPoolId,
-            Logins: {
-                [`cognito-idp.${AWS_CONFIG.region}.amazonaws.com/${AWS_CONFIG.userPoolId}`]: localStorage.getItem('idToken')
-            }
-        });
-    } catch (err) {
-        console.error("❌ Credential Setup Error:", err);
-        return;
-    }
+        progressBar.style.width = progress + '%';
+        progressText.textContent = `Uploading... ${Math.round(progress)}%`;
 
-    const s3 = new AWS.S3();
-    
-    // 決定上傳路徑 (如果有 email 就分資料夾，沒有就放根目錄 uploads)
-    const userFolder = AppState.currentUserEmail ? `${AppState.currentUserEmail}/` : '';
-    const s3Key = `uploads/${userFolder}${file.name}`;
-
-    console.log(`📤 Uploading to Bucket: ${AWS_CONFIG.s3BucketName}, Key: ${s3Key}`);
-
-    const params = {
-        Bucket: AWS_CONFIG.s3BucketName,
-        Key: s3Key,
-        Body: file,
-        ContentType: file.type
-    };
-
-    const upload = s3.upload(params);
-
-    upload.on('httpUploadProgress', (evt) => {
-        const progress = Math.round((evt.loaded * 100) / evt.total);
-        if (progressBar) progressBar.style.width = progress + '%';
-        if (progressText) progressText.textContent = `Uploading... ${progress}%`;
-    });
-
-    upload.send((err, data) => {
-        if (err) {
-            console.error("❌ S3 Upload Failed:", err);
-            if (progressText) {
-                progressText.textContent = '❌ Failed';
-                progressText.style.color = '#ef4444';
-            }
-            showToast('❌', 'Upload failed: ' + err.message);
-            return;
-        }
-        
-        console.log("✅ Upload Success:", data);
-        if (progressText) {
+        if (progress >= 100) {
+            clearInterval(interval);
             progressText.textContent = '✓ Upload complete';
             progressText.style.color = '#10b981';
-        }
 
-        // 模擬延遲更新 UI
-        setTimeout(() => {
-            if (typeof AppState !== 'undefined' && typeof renderFileDashboard === 'function') {
+            // Add to dashboard (delayed slightly for effect)
+            setTimeout(() => {
                 AppState.addFile({
                     id: Date.now(),
                     name: file.name,
                     size: file.size,
-                    s3Key: data.Key, 
                     date: new Date().toISOString().split('T')[0],
                     status: 'normal'
                 });
                 renderFileDashboard();
-            }
-        }, 1000);
-    });
+            }, 1000);
+        }
+    }, 300);
 }
+

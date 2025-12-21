@@ -10,8 +10,7 @@
     height: 100%;
     min-height: 0;
     max-height: 100%;
-    /* 核心修正：將原本的 overflow: hidden 改為 visible */
-    overflow: visible !important;
+    overflow: hidden;
 }
 
 .upload-section {
