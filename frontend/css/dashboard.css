@@ -1,108 +1,16 @@
-/* Dashboard Styles - 檔案列表與元件設計 (Tab 切換版) */
+/* Dashboard Styles - 檔案列表與元件設計 (強制單行圖示版) */
 
-/* ==========================================
-   1. 列表容器與視窗
-   ========================================== */
-
-/* 讓列表視窗可以捲動，並填滿卡片剩餘空間 */
-.lists-viewport {
+/* --- 檔案列表容器 --- */
+.file-list {
     flex: 1;
     overflow-y: auto;
     padding-right: 5px;
+    margin-top: 10px;
     min-height: 0;
-    width: 100%;
-    position: relative;
+    width: 100%; 
 }
 
-/* 具體的列表區塊 (預設 block, 會被 JS 切換 display) */
-.file-list {
-    width: 100%;
-    padding-bottom: 10px;
-}
-
-/* ==========================================
-   2. Tab 切換按鈕 (New)
-   ========================================== */
-
-.list-tabs-container {
-    display: flex;
-    background: #f1f5f9;
-    padding: 4px;
-    border-radius: 8px;
-    margin-bottom: 15px;
-    gap: 4px;
-}
-
-.list-tab-btn {
-    flex: 1;
-    border: none;
-    background: transparent;
-    padding: 8px 12px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #64748b;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-}
-
-.list-tab-btn:hover {
-    color: #334155;
-    background: rgba(255, 255, 255, 0.5);
-}
-
-.list-tab-btn.active {
-    background: #ffffff;
-    color: #6366f1; /* 主題色 Indigo */
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-}
-
-/* ==========================================
-   3. 搜尋框區域 (New)
-   ========================================== */
-
-.search-wrapper {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
-    width: 100%;
-}
-
-.search-wrapper input {
-    flex: 1;
-    min-width: 0;
-    margin-bottom: 0 !important;
-    padding: 8px 12px;
-    font-size: 13px;
-    height: 36px;
-}
-
-.search-wrapper button {
-    flex: 0 0 auto;
-    width: auto !important;
-    height: 36px;
-    margin-top: 0 !important;
-    padding: 0 15px !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-}
-
-.search-wrapper button:hover {
-    opacity: 0.9;
-    transform: translateY(-1px);
-}
-
-/* ==========================================
-   4. 檔案列樣式 (垂直堆疊版 - 適合側邊欄)
-   ========================================== */
-
+/* --- 檔案列 (垂直分層設計) --- */
 .file-row {
     display: flex;
     flex-direction: column; /* 垂直堆疊 */
@@ -110,12 +18,11 @@
     padding: 12px;
     border: 1px solid #f1f5f9;
     border-radius: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     background: #fff;
     transition: all 0.2s;
     overflow: hidden;
     align-items: flex-start;
-    box-sizing: border-box;
 }
 
 .file-row:hover {
@@ -132,7 +39,7 @@
     justify-content: flex-start;
     gap: 12px;
     width: 100%;
-    min-width: 0; 
+    min-width: 0; /* 關鍵：允許縮小 */
     margin-bottom: 8px;    
 }
 
@@ -143,21 +50,22 @@
 
 .file-info {
     flex: 1;                
-    min-width: 0; 
+    min-width: 0; /* 關鍵：觸發文字截斷 */
     display: flex;
     flex-direction: column;
     gap: 4px;
     text-align: left;
 }
 
-/* 檔名特效 */
+/* --- 檔名特效 (單行 + 漸層淡出) --- */
 .file-title {
     font-size: 14px;
     font-weight: 600;
     color: #334155;
     white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis; /* 使用省略號 */
+    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
     display: block;
     width: 100%;
 }
@@ -172,7 +80,7 @@
     overflow: hidden;
 }
 
-/* 狀態標籤 */
+/* --- 狀態標籤 --- */
 .status-tag {
     padding: 1px 5px;
     border-radius: 4px;
@@ -183,32 +91,42 @@
     flex-shrink: 0;
 }
 
-/* 下層：操作按鈕區 */
+/* --- 下層：操作按鈕區 (關鍵修正) --- */
 .file-actions {
     display: flex;
+    /* 改為 Space-between 讓按鈕平均分散，或者 flex-end 靠右 */
     justify-content: flex-end; 
+    
+    /* ★★★ 強制不換行 ★★★ */
     flex-wrap: nowrap !important;
-    gap: 6px; 
+    
+    gap: 6px; /* 按鈕之間的間距 */
     width: 100%;
     padding-top: 8px;
     border-top: 1px dashed #f1f5f9; 
+    overflow: visible; /* 確保陰影不被切掉 */
 }
 
-/* 按鈕樣式 */
+/* 按鈕樣式：改為方形圖示按鈕 */
 .action-btn {
+    /* 設定固定寬高，確保四個按鈕能塞進一行 */
     width: 32px; 
     height: 32px;
-    padding: 0; 
+    padding: 0; /* 移除內距，讓 Icon 居中 */
+    
     border-radius: 6px;
     border: 1px solid #e2e8f0;
     background: white;
     cursor: pointer;
     font-size: 14px;
+    
+    /* Flex 居中大法 */
     display: flex;
     align-items: center;
     justify-content: center;
+    
     transition: all 0.2s;
-    flex: 0 0 auto; 
+    flex: 0 0 auto; /* 禁止按鈕縮小 */
 }
 
 .action-btn:hover { 
@@ -218,19 +136,36 @@
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-/* ==========================================
-   5. 閱讀器樣式
-   ========================================== */
+/* --- 登出與使用者資訊 --- */
+.user-info { font-size: 13px; color: #4b5563; }
+#statusBarEmail { font-weight: 500; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.logout-btn-compact {
+    width: 100%;
+    background-color: #ffffff;
+    color: #4b5563;
+    border: 1px solid #e5e7eb;
+    padding: 8px 0;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.logout-btn-compact:hover { background-color: #fef2f2; color: #ef4444; border-color: #fca5a5; }
+
+/* Dashboard Styles - 閱讀器元件 (從 HTML 移入) */
+
+/* 閱讀器卡片：修正 Flex 屬性以填滿空間 */
 .viewer-card {
     display: flex !important;
     flex-direction: column !important;
-    padding: 0 !important; 
+    padding: 0 !important; /* 移除內距讓 iframe 滿版 */
     min-height: 0;
     overflow: hidden;
-    height: 100%; /* 確保填滿父容器 */
 }
 
+/* 閱讀器標題列 */
 .viewer-header {
     background: #f8fafc;
     padding: 10px 15px;
@@ -241,9 +176,10 @@
     font-size: 14px;
     font-weight: 600;
     color: #334155;
-    flex: 0 0 auto;
+    flex: 0 0 auto; /* 防止被壓縮 */
 }
 
+/* 關閉按鈕 */
 .close-viewer-btn {
     background: #ffffff;
     border: 1px solid #e2e8f0;
@@ -261,15 +197,17 @@
     border-color: #fca5a5;
 }
 
+/* Iframe 預覽視窗 */
 #docViewer {
     flex: 1;
     width: 100%;
     height: 100%;
     border: none;
     background: #f1f5f9;
-    display: none; 
+    display: none; /* 預設隱藏，由 JS 控制顯示 */
 }
 
+/* 空狀態提示 */
 #viewerPlaceholder {
     flex: 1;
     display: flex;
@@ -279,21 +217,51 @@
     background: #f8fafc;
 }
 
-/* 空狀態與錯誤狀態 */
-.empty-state-gray {
-    text-align: center;
-    padding: 30px 10px;
-    color: #9ca3af;
-    font-size: 14px;
-    border: 1px dashed #e5e7eb;
-    border-radius: 8px;
-    background: #f9fafb;
-    margin-top: 10px;
+/* --- Public Repository 搜尋欄修正 --- */
+
+/* 確保搜尋容器使用 Flex 排列 */
+.search-container {
+    display: flex !important;
+    gap: 6px !important;
+    margin-bottom: 12px !important;
+    width: 100%; /* 限制容器不超過父層 */
+    box-sizing: border-box;
 }
 
-.loading-state, .error-state {
-    text-align: center;
-    padding: 20px;
-    font-size: 14px;
-    color: #6b7280;
+/* 輸入框：佔據剩餘空間，但允許縮小 */
+#crawlerSearchInput {
+    flex: 1;       /* 自動填滿剩餘空間 */
+    min-width: 0;  /* ★關鍵：防止內容撐開導致溢出 */
+    width: 100%;   /* 重置寬度 */
+    margin-bottom: 0 !important;
+    padding: 6px 10px;
+    font-size: 13px;
+    height: 32px; /* 固定高度，對齊按鈕 */
+}
+
+/* 搜尋按鈕：固定大小，禁止被壓縮 */
+.search-container button {
+    flex: 0 0 auto; /* 禁止縮小 */
+    width: auto !important;
+    margin-top: 0 !important;
+    padding: 0 12px !important;
+    height: 32px; /* 固定高度 */
+    font-size: 13px;
+    white-space: nowrap; /* 文字不換行 */
+    
+    /* 美化按鈕 */
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.search-container button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }

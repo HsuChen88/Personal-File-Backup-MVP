@@ -128,7 +128,34 @@ Resources:
         authenticated: !GetAtt CognitoAuthRole.Arn
 
 # ==========================================
-# 5. 輸出結果 (部署完後請複製到 js/config.js)
+  # 5. Lambda - 產生 S3 預簽名下載連結 (Node.js)
+  # ==========================================
+  DownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      # 請確認路徑是否為 src/RequestDownloadHandler/
+      CodeUri: src/RequestDownloadHandler/ 
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Timeout: 10
+      Environment:
+        Variables:
+          # 將 S3 Bucket 名稱傳給 Lambda
+          BUCKET_NAME: !Ref StorageBucket
+      Policies:
+        # 賦予 Lambda 讀取 S3 的權限以產生預簽名連結
+        - S3ReadPolicy:
+            BucketName: !Sub ${AppName}-storage-${AWS::AccountId}
+      Events:
+        # 建立 API Gateway 觸發點
+        DownloadApi:
+          Type: Api
+          Properties:
+            Path: /download
+            Method: get
+
+# ==========================================
+# 6. 輸出結果 (部署完後請複製到 js/config.js)
 # ==========================================
 Outputs:
   Region:
@@ -141,3 +168,7 @@ Outputs:
     Value: !Ref UserPoolClient
   IdentityPoolId:
     Value: !Ref IdentityPool
+  # 新增 API 網址輸出
+  ApiGatewayUrl:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"

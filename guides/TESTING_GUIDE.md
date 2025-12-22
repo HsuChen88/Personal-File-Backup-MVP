@@ -376,17 +376,10 @@ aws logs tail /aws/lambda/dropbex-mvp-NotifyUploadedHandler --follow --region us
 
 ## 🔧 步驟 5：更新前端配置
 
-取得 API Gateway URL 後，使用 `build-frontend-config.bat` 或 `build-frontend-config.ps1` 自動產生前端配置：
+取得 API Gateway URL 後，使用 `build-frontend-config.ps1` 自動產生前端配置：
 
-**Windows Batch (推薦)**：
-```cmd
-REM Ensure FRONTEND_API_URL or API_GATEWAY_URL is set in .env file
-.\build-frontend-config.bat
-```
-
-**PowerShell (備用)**：
 ```powershell
-# Ensure FRONTEND_API_URL or API_GATEWAY_URL is set in .env file
+# 確保 .env 檔案中已設定 FRONTEND_API_URL 或 API_GATEWAY_URL
 .\build-frontend-config.ps1
 ```
 

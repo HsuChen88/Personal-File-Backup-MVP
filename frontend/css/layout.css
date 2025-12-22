@@ -1,95 +1,43 @@
-/* Layout Styles - 核心排版架構 (全頁捲動修復版) */
+/* Layout Styles - 核心排版架構 */
 
-/* =========================================
-   1. 基礎設定：強制開啟視窗捲動
-   ========================================= */
-
-/* 關鍵修正：確保網頁根元素允許垂直捲動，不被鎖死 */
-html, body {
-    height: auto !important;       /* 允許高度隨內容增長 */
-    min-height: 100vh;             /* 確保背景至少填滿一個螢幕 */
-    overflow-y: auto !important;   /* ★ 強制開啟垂直捲動軸 ★ */
-    overflow-x: hidden;            /* 避免水平捲動 */
-    margin: 0;
-    padding: 0;
-}
-
-/* 主容器：移除固定高度限制 */
 .container {
     max-width: 100% !important;
-    margin: 0;
-    padding: 0;
+    margin: 0 auto;
+    padding: 15px 30px;
     display: flex;
     flex-direction: column;
-    
-    /* 讓容器高度隨內容撐開，不要鎖死在 100vh */
-    height: auto !important; 
-    min-height: 100vh;
-    
-    background-color: #667eea;
-    
-    /* 設定為 visible，讓內容撐開 Body，觸發 Body 的滾軸 */
-    overflow: visible !important; 
+    height: 100vh; 
+    background: transparent !important;
 }
 
-/* =========================================
-   2. 兩欄式 Grid 系統 (Left 400px + Right Auto)
-   ========================================= */
-
+/* --- 三欄式 Grid 系統 --- */
 .scholar-dashboard {
-    display: none; /* 初始隱藏，登入後由 JS 開啟 */
-    flex: 1; 
-    width: 100%;
-    padding: 20px 25px;
-    box-sizing: border-box;
+    display: none; 
+    /* 左中右比例：1 : 4.5 : 1 */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 4.5fr) minmax(0, 1fr); 
+    grid-template-rows: 100%; 
     gap: 20px;
-    
-    /* ★ 左側固定 400px，右側自動填滿剩餘寬度 */
-    grid-template-columns: 400px 1fr;
-    
-    /* 高度自動，不設限，讓內容決定多長 */
-    grid-template-rows: auto; 
-    align-items: start; /* 頂部對齊 */
+    flex: 1; 
+    min-height: 0; /* 防止內容撐開 */
+    width: 100%;
+    margin-bottom: 10px;
 }
 
 .scholar-dashboard.visible { display: grid !important; }
 
-/* 登入前的置中容器 */
-.main-grid {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 40px;
-    min-height: 80vh; 
-}
-
-/* =========================================
-   3. 欄位容器 (Columns)
-   ========================================= */
-
-/* 左側欄：包含上傳區塊與合併列表 */
-.dashboard-column-left {
+/* 欄位容器 */
+.dashboard-column-left, 
+.dashboard-column-middle,
+.dashboard-column-right {
     display: flex;
     flex-direction: column;
     gap: 15px;
-    height: auto; /* 隨內容長高 */
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
 }
 
-/* 右側欄：包含閱讀器 */
-.dashboard-column-viewer {
-    display: flex;
-    flex-direction: column;
-    height: 100%; 
-    /* 給予閱讀器一個基本高度，避免內容太少時太短 */
-    min-height: 800px; 
-}
-
-/* =========================================
-   4. 卡片樣式 (Cards)
-   ========================================= */
-
-/* 通用卡片容器 */
+/* --- 通用卡片容器 --- */
 .card {
     background-color: #ffffff !important;
     border-radius: 12px;
@@ -99,63 +47,27 @@ html, body {
     display: flex;
     flex-direction: column;
     width: 100%;
-    overflow: hidden; 
+    overflow: hidden; /* 卡片內部溢出隱藏 */
 }
 
-/* --- 特殊卡片微調 --- */
+/* 特殊卡片微調 */
+.upload-card-new { flex: 0 0 auto; padding: 15px !important; }
+.viewer-card { flex: 1; padding: 0 !important; }
+.logout-card { flex: 0 0 auto; padding: 12px 20px !important; gap: 10px; }
 
-/* 上傳區塊 */
-.upload-card-new { 
-    flex: 0 0 auto; /* 高度由內容決定 */
-    padding: 15px !important; 
-}
-
-/* ★★★ 列表合併區塊 (My Collection / Public) ★★★ */
-.list-card-combined {
-    flex: 1;          
+/* 列表區域容器 (讓內部可以捲動) */
+.my-files-area, 
+.public-repository-area {
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    
-    /* ★ 設定最小高度 700px (可依需求調整) ★ */
-    /* 這會確保列表夠長，如果超出螢幕，瀏覽器右側就會出現滾軸 */
-    min-height: 700px; 
-    height: auto;
-    
-    padding: 15px !important;
 }
 
-/* 閱讀器卡片 */
-.viewer-card { 
-    flex: 1; 
-    height: 100%;
-    padding: 0 !important; /* 滿版顯示 iframe */
-}
-
-/* 登出/其他小卡片 */
-.logout-card { 
-    flex: 0 0 auto; 
-    padding: 12px 20px !important; 
-    gap: 10px; 
-}
-
-/* =========================================
-   5. 響應式設定 (Mobile/Tablet)
-   ========================================= */
-
+/* 響應式設定 (平板/手機) */
 @media (max-width: 1024px) {
-    /* 手機版強制單欄垂直排列 */
-    .scholar-dashboard { 
-        grid-template-columns: 1fr; 
-        display: flex; 
-        flex-direction: column; 
-    }
-    
-    /* 調整手機版的高度，避免過長或過短 */
-    .list-card-combined {
-        min-height: 500px;
-    }
-
-    .dashboard-column-viewer { 
-        min-height: 600px; 
-    }
+    html, body { overflow: auto; height: auto; }
+    .container { height: auto; overflow: visible; }
+    .scholar-dashboard { grid-template-columns: 1fr; height: auto; display: flex; flex-direction: column; }
+    .my-files-area, .public-repository-area { height: 500px; flex: none; }
 }

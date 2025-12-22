@@ -54,17 +54,9 @@ copy .env.example .env
 
 如果使用前端功能，執行以下命令從 `.env` 產生前端配置：
 
-**Windows Batch (推薦)**：
-```cmd
-.\build-frontend-config.bat
-```
-
-**PowerShell (備用)**：
 ```powershell
 .\build-frontend-config.ps1
 ```
-
-兩個腳本功能相同，可根據環境選擇使用。
 
 ---
 
@@ -92,16 +84,6 @@ copy .env.example .env
 | `SNS_TOPIC_ARN` | SNS Topic ARN | CloudFormation Outputs 或 AWS Console | ✅ |
 | `API_GATEWAY_URL` | API Gateway URL | 使用命令或 CloudFormation Outputs | ✅ |
 
-### Cognito 設定（前端認證）
-
-這些資訊需要在**首次部署後**填入，用於前端使用者認證：
-
-| 變數名稱 | 說明 | 如何取得 | 必填 |
-|---------|------|----------|------|
-| `COGNITO_USER_POOL_ID` | Cognito User Pool ID | CloudFormation Outputs 或 AWS Console | ✅ |
-| `COGNITO_APP_CLIENT_ID` | Cognito App Client ID | CloudFormation Outputs 或 AWS Console | ✅ |
-| `COGNITO_IDENTITY_POOL_ID` | Cognito Identity Pool ID | CloudFormation Outputs 或 AWS Console | ✅ |
-
 ### 測試腳本設定
 
 | 變數名稱 | 說明 | 範例值 | 必填 |
@@ -114,14 +96,6 @@ copy .env.example .env
 | 變數名稱 | 說明 | 範例值 | 必填 |
 |---------|------|--------|------|
 | `FRONTEND_API_URL` | 前端使用的 API Gateway URL | 與 `API_GATEWAY_URL` 相同 | ✅ |
-
-**注意**：前端配置檔案 `frontend/js/config.js` 會由 `build-frontend-config.bat` 或 `build-frontend-config.ps1` 腳本自動從 `.env` 檔案產生。請確保已設定以下變數：
-- `AWS_REGION`
-- `API_GATEWAY_URL`
-- `COGNITO_USER_POOL_ID`
-- `COGNITO_APP_CLIENT_ID`
-- `COGNITO_IDENTITY_POOL_ID`
-- `S3_BUCKET_NAME`
 
 ### 其他設定（可選）
 
@@ -162,31 +136,18 @@ copy .env.example .env
 4. **部署後更新資源資訊**：
    部署完成後，從 CloudFormation Outputs 或 AWS Console 取得以下資訊並填入 `.env`：
    ```env
-   AWS_REGION=us-east-1
    S3_BUCKET_NAME=dropbex-mvp-bucket-123456789012
    SNS_TOPIC_ARN=arn:aws:sns:us-east-1:123456789012:dropbex-mvp-topic
    API_GATEWAY_URL=https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/Prod
-   COGNITO_USER_POOL_ID=us-east-1_XXXXXXXXX
-   COGNITO_APP_CLIENT_ID=your-app-client-id-here
-   COGNITO_IDENTITY_POOL_ID=us-east-1:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
    TEST_API_URL=https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/Prod
    TEST_BUCKET_NAME=dropbex-mvp-bucket-123456789012
    FRONTEND_API_URL=https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/Prod
    ```
 
-5. **建置前端配置**（**必填**，用於產生 `frontend/js/config.js`）：
-   
-   **Windows Batch (推薦)**：
-   ```cmd
-   .\build-frontend-config.bat
-   ```
-   
-   **PowerShell (備用)**：
+5. **建置前端配置**（如需要）：
    ```powershell
    .\build-frontend-config.ps1
    ```
-   
-   **重要**：此步驟會從 `.env` 檔案讀取配置並產生前端使用的 `config.js`。請確保已正確設定所有 Cognito 和 AWS 相關變數。
 
 ### 取得部署後的資源資訊
 
@@ -211,33 +172,6 @@ aws apigateway get-rest-apis --region us-east-1 --query "items[?name=='Api From 
 # 組合成 URL（將 <api-id> 替換為實際的 API ID）
 # URL 格式：https://<api-id>.execute-api.us-east-1.amazonaws.com/Prod
 # 範例：https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/Prod
-```
-
-#### 取得 Cognito User Pool ID
-
-```cmd
-# 從 CloudFormation Outputs 取得
-aws cloudformation describe-stacks --stack-name dropbex-mvp --region us-east-1 --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text
-
-# 或從 AWS Console 的 Cognito 服務中查看 User Pool 的 ID
-```
-
-#### 取得 Cognito App Client ID
-
-```cmd
-# 從 CloudFormation Outputs 取得
-aws cloudformation describe-stacks --stack-name dropbex-mvp --region us-east-1 --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientId'].OutputValue" --output text
-
-# 或從 AWS Console 的 Cognito 服務中查看 User Pool > App clients
-```
-
-#### 取得 Cognito Identity Pool ID
-
-```cmd
-# 從 CloudFormation Outputs 取得
-aws cloudformation describe-stacks --stack-name dropbex-mvp --region us-east-1 --query "Stacks[0].Outputs[?OutputKey=='IdentityPoolId'].OutputValue" --output text
-
-# 或從 AWS Console 的 Cognito 服務中查看 Identity Pools
 ```
 
 ---

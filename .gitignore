@@ -1,27 +1,9 @@
-# ========================
-# Node.js / NPM (這是你目前最需要的)
-# ========================
-# 忽略所有資料夾下的 node_modules (包含 src 裡面的)
-
-test.txt
-test_for_update.png
-test-upload.ps1
-
-node_modules/
-# 忽略 npm debug log
-npm-debug.log
-yarn-error.log
-
-# ========================
-# AWS SAM
-# ========================
 .aws-sam/
-# 注意：samconfig.toml 應該提交到版本控制，因為它包含團隊共用的部署設定
-
-# ========================
-# Python
-# ========================
+node_modules/
 __pycache__/
+samconfig.toml
+frontend/js/config.js
+.history/
 *.py[cod]
 *$py.class
 *.so
