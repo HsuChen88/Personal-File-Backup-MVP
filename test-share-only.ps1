@@ -1,10 +1,11 @@
-# PowerShell Script: Test Share File API
+# PowerShell Script: Test Share File API (Share Only)
 #
 # This script tests the /share-file API endpoint to send file share notifications via SNS
+# Note: This script does NOT subscribe the email first. Make sure the email is already subscribed.
 #
 # Usage:
-#   .\test-share.ps1
-#   .\test-share.ps1 -FileName "test.pdf" -RecipientEmail "user@example.com" -CustomMessage "Test message"
+#   .\test-share-only.ps1
+#   .\test-share-only.ps1 -FileName "test.pdf" -RecipientEmail "user@example.com" -CustomMessage "Test message"
 #
 # Note: API Gateway URL can be set in .env file (API_GATEWAY_URL or FRONTEND_API_URL)
 
@@ -15,7 +16,7 @@ param(
 )
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "Test Share File API" -ForegroundColor Cyan
+Write-Host "Test Share File API (Share Only)" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -60,6 +61,9 @@ Write-Host "  File Name: $FileName" -ForegroundColor Gray
 Write-Host "  Recipient Email: $RecipientEmail" -ForegroundColor Gray
 Write-Host "  Custom Message: $CustomMessage" -ForegroundColor Gray
 Write-Host ""
+Write-Host "Note: This script only sends the share request." -ForegroundColor Yellow
+Write-Host "      The ShareFileHandler will attempt to auto-subscribe the email if not already subscribed." -ForegroundColor Yellow
+Write-Host ""
 
 # Prepare request body
 $requestBody = @{
@@ -73,7 +77,7 @@ Write-Host $requestBody -ForegroundColor Gray
 Write-Host ""
 
 # Send API request
-Write-Host "Step 1: Sending share file request to API..." -ForegroundColor Cyan
+Write-Host "Sending share file request to API..." -ForegroundColor Cyan
 try {
     $response = Invoke-RestMethod -Uri $ApiEndpoint -Method Post -Body $requestBody -ContentType "application/json" -ErrorAction Stop
     
@@ -96,6 +100,12 @@ try {
     if ($response.recipientEmail) {
         Write-Host "Recipient Email: $($response.recipientEmail)" -ForegroundColor Green
     }
+    if ($response.subscriptionStatus) {
+        Write-Host "Subscription Status: $($response.subscriptionStatus)" -ForegroundColor Green
+    }
+    if ($response.note) {
+        Write-Host "Note: $($response.note)" -ForegroundColor Yellow
+    }
     
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Cyan
@@ -103,12 +113,15 @@ try {
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "Next Steps:" -ForegroundColor Yellow
-    Write-Host "  1. Check the recipient email inbox: $RecipientEmail" -ForegroundColor Yellow
-    Write-Host "  2. Verify the email contains:" -ForegroundColor Yellow
+    Write-Host "  1. If subscriptionStatus is 'subscribed', check email inbox for confirmation:" -ForegroundColor Yellow
+    Write-Host "     $RecipientEmail" -ForegroundColor Yellow
+    Write-Host "     - Click the confirmation link in the subscription email" -ForegroundColor Yellow
+    Write-Host "  2. After confirming subscription (if needed), check for the share notification email" -ForegroundColor Yellow
+    Write-Host "  3. Verify the email contains:" -ForegroundColor Yellow
     Write-Host "     - File name: $FileName" -ForegroundColor Yellow
     Write-Host "     - Custom message: $CustomMessage" -ForegroundColor Yellow
-    Write-Host "  3. If email is not received, check:" -ForegroundColor Yellow
-    Write-Host "     - SNS Topic subscription status" -ForegroundColor Yellow
+    Write-Host "  4. If email is not received, check:" -ForegroundColor Yellow
+    Write-Host "     - SNS Topic subscription status (must be 'Confirmed')" -ForegroundColor Yellow
     Write-Host "     - CloudWatch Logs for ShareFileHandler Lambda" -ForegroundColor Yellow
     Write-Host "     - SNS Topic delivery status in AWS Console" -ForegroundColor Yellow
     Write-Host ""
@@ -152,6 +165,7 @@ try {
     Write-Host "  2. Check if the /share-file endpoint is deployed" -ForegroundColor Yellow
     Write-Host "  3. Verify Lambda function ShareFileHandler exists and has proper permissions" -ForegroundColor Yellow
     Write-Host "  4. Check CloudWatch Logs for error details" -ForegroundColor Yellow
+    Write-Host "  5. Verify email is subscribed and confirmed in SNS Topic" -ForegroundColor Yellow
     Write-Host ""
     
     exit 1
