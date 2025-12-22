@@ -1,4 +1,5 @@
 ---
 alwaysApply: true
 ---
-我用 windows 11，通常用bat，必要時才使用powershell，任何輸出只能使用英文。
+
+我用windows 11，生成腳本為避免各裝置差異，要同時生成bat和powershell，且內容皆只能使用英文。

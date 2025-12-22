@@ -70,4 +70,4 @@ desktop.ini
 # ========================
 # 建置產生的前端配置（由 build-frontend-config.ps1 產生）
 # frontend/config.js 會由建置腳本產生，但為了方便開發，暫時不忽略 (保留你的註解)
-# frontend/config.js
+frontend/config.js
