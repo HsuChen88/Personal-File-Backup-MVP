@@ -1,46 +1,58 @@
 ﻿AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
+Description: >
+  Dropbex MVP - Full Stack Architecture
+  S3 Storage + Cognito Auth + Python Lambda (Groq AI)
 
 Parameters:
   AppName:
     Type: String
     Default: dropbex-app-2025
+    Description: 應用程式名稱
   GroqApiKey:
     Type: String
     NoEcho: true
+    Description: 請輸入您的 Groq API Key (用於 llama-3.1-8b-instant)
 
 Resources:
-  # 1. S3 Bucket (移除內部的 NotificationConfiguration 以打破循環)
+  # ==========================================
+  # 1. S3 儲存桶 (儲存個人與公共檔案)
+  # ==========================================
   StorageBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Ref AppName
+      # 使用 AccountId 確保名稱在全球 S3 中不重複
+      BucketName: !Sub ${AppName}-storage-${AWS::AccountId}
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
             AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
             AllowedOrigins: ['*']
+            ExposedHeaders: [ETag, x-amz-meta-custom-header]
             MaxAge: 3000
 
-  # 2. Lambda 函數
+  # ==========================================
+  # 2. Lambda - Groq AI 摘要生成器 (Python)
+  # ==========================================
   SummaryFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: backend/
-      Handler: lambda_function.lambda_handler
+      # [已修正] 指向 summary_handler.py 內的 lambda_handler 函數
+      Handler: summary_handler.lambda_handler 
       Runtime: python3.11
-      Timeout: 45
+      Timeout: 60
+      MemorySize: 256
       Environment:
         Variables:
           GROQ_API_KEY: !Ref GroqApiKey
       Policies:
         - S3ReadPolicy:
-            BucketName: !Ref AppName # 使用參數而非直接引用資源物件
+            BucketName: !Sub ${AppName}-storage-${AWS::AccountId}
         - S3WritePolicy:
-            BucketName: !Ref AppName
+            BucketName: !Sub ${AppName}-storage-${AWS::AccountId}
       Events:
-        # 在這裡定義觸發器，SAM 會自動處理權限與順序
-        FileUpload:
+        FileUploadEvent:
           Type: S3
           Properties:
             Bucket: !Ref StorageBucket
@@ -51,7 +63,9 @@ Resources:
                   - Name: prefix
                     Value: uploads/
 
-  # 3. Cognito 資源 (維持不變)
+  # ==========================================
+  # 3. Cognito - 使用者驗證系統
+  # ==========================================
   UserPool:
     Type: AWS::Cognito::UserPool
     Properties:
@@ -69,12 +83,15 @@ Resources:
   IdentityPool:
     Type: AWS::Cognito::IdentityPool
     Properties:
-      IdentityPoolName: !Sub ${AppName}_identity_pool
+      IdentityPoolName: !Sub ${AppName}IdentityPool
       AllowUnauthenticatedIdentities: false
       CognitoIdentityProviders:
         - ClientId: !Ref UserPoolClient
           ProviderName: !GetAtt UserPool.ProviderName
 
+  # ==========================================
+  # 4. IAM Role - 授權前端 JS 直接存取 S3
+  # ==========================================
   CognitoAuthRole:
     Type: AWS::IAM::Role
     Properties:
@@ -88,6 +105,20 @@ Resources:
             Condition:
               StringEquals:
                 "cognito-identity.amazonaws.com:aud": !Ref IdentityPool
+      Policies:
+        - PolicyName: DropbexS3FullAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:DeleteObject
+                Resource: 
+                  - !Sub arn:aws:s3:::${StorageBucket}
+                  - !Sub arn:aws:s3:::${StorageBucket}/*
 
   IdentityPoolRoleAttachment:
     Type: AWS::Cognito::IdentityPoolRoleAttachment
@@ -96,39 +127,17 @@ Resources:
       Roles:
         authenticated: !GetAtt CognitoAuthRole.Arn
 
-  # 4. 網站託管
-  WebsiteBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub ${AppName}-web-hosting
-      WebsiteConfiguration:
-        IndexDocument: index.html
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: false
-        BlockPublicPolicy: false
-
-  WebsiteBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref WebsiteBucket
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal: '*'
-            Action: s3:GetObject
-            Resource: !Sub arn:aws:s3:::${WebsiteBucket}/*
-
+# ==========================================
+# 5. 輸出結果 (部署完後請複製到 js/config.js)
+# ==========================================
 Outputs:
   Region:
     Value: !Ref AWS::Region
+  S3BucketName:
+    Value: !Ref StorageBucket
   UserPoolId:
     Value: !Ref UserPool
   UserPoolClientId:
     Value: !Ref UserPoolClient
   IdentityPoolId:
     Value: !Ref IdentityPool
-  S3BucketName:
-    Value: !Ref StorageBucket
-  WebsiteURL:
-    Value: !GetAtt WebsiteBucket.WebsiteURL
