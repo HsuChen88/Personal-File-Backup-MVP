@@ -26,10 +26,53 @@ function ensureAWSCredentials() {
 }
 
 /**
+ * [新增功能] 自動初始化 S3 資料夾結構 (僅在不存在時執行)
+ * 確保 uploads/, public/, 以及 uploads/{userEmail}/ 存在
+ */
+async function autoInitializeFolders(userEmail) {
+    if (!userEmail) return;
+
+    const s3 = new AWS.S3();
+    const requiredFolders = [
+        'public/',
+        'uploads/',
+        `uploads/${userEmail}/`
+    ];
+
+    console.log("🛠️ 正在驗證 S3 目錄結構...");
+
+    for (const folderKey of requiredFolders) {
+        try {
+            // 使用 headObject 檢查該路徑是否存在
+            await s3.headObject({
+                Bucket: AWS_CONFIG.s3BucketName,
+                Key: folderKey
+            }).promise();
+            // console.log(`✅ 目錄已存在: ${folderKey}`);
+        } catch (err) {
+            // 404 代表不存在，這時才執行建立動作
+            if (err.statusCode === 404 || err.code === 'NotFound') {
+                console.log(`✨ 偵測到缺失目錄，正在建立: ${folderKey}`);
+                try {
+                    await s3.putObject({
+                        Bucket: AWS_CONFIG.s3BucketName,
+                        Key: folderKey,
+                        Body: '',
+                        ContentType: 'application/x-directory'
+                    }).promise();
+                } catch (putErr) {
+                    console.warn(`⚠️ 建立目錄 ${folderKey} 失敗:`, putErr);
+                }
+            }
+        }
+    }
+}
+
+/**
  * 儀表板統一入口
  * 觸發時機：登入成功、頁面載入、操作完成後
  */
-function refreshAllDashboards() {
+async function refreshAllDashboards() {
     console.log("🔄 同步所有儀表板資料...");
     
     // 檢查憑證，若無效則顯示提示
@@ -38,6 +81,22 @@ function refreshAllDashboards() {
         document.getElementById('fileDashboardList').innerHTML = '<div class="empty-state-gray">請先登入以查看檔案</div>';
         return;
     }
+
+    // --- [修改點] 在同步資料前，先執行自動資料夾初始化 ---
+    // 嘗試從 AppState 或介面獲取 Email
+    let userEmail = null;
+    if (typeof AppState !== 'undefined' && AppState.currentUserEmail) {
+        userEmail = AppState.currentUserEmail;
+    } else {
+        const emailElem = document.getElementById('statusBarEmail');
+        if (emailElem) userEmail = emailElem.innerText;
+    }
+
+    // 如果成功獲取 Email，執行初始化
+    if (userEmail && userEmail.includes('@')) {
+        await autoInitializeFolders(userEmail);
+    }
+    // -----------------------------------------------------
 
     refreshFileDashboard();    
     refreshPublicRepository(); 

@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dropbex - Upload once, backed up automatically</title>
 
-    <link rel="icon" type="image/png" href="images/favicon.png">
-    <link rel="apple-touch-icon" href="images/favicon.png">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="favicon.png">
 
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
@@ -84,9 +84,14 @@
                     <div class="dropzone" id="dropzone" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
                         <div class="dropzone-icon">📤</div>
                         <div class="dropzone-text">Drag & Drop Papers</div>
-                        <label for="fileInputLoggedIn" class="choose-file-btn">or Choose File</label>
-                        <input type="file" id="fileInputLoggedIn" class="file-input" multiple onchange="handleFileSelect(event)">
+                        
+                        <div style="margin: 10px 0; font-size: 13px; color: #6b7280;">or</div>
+                        
+                        <label for="fileInputLoggedIn" class="choose-file-btn">Choose File</label>
+                        
+                        <input type="file" id="fileInputLoggedIn" class="file-input" style="display: none;" multiple onchange="handleFileSelect(event)">
                     </div>
+                    
                     <div id="progressSection" class="progress-section">
                         <div id="fileList"></div>
                     </div>
@@ -115,7 +120,7 @@
                         </div>
                     </div>
                     
-                    <iframe id="docViewer" src=""></iframe>
+                    <iframe id="docViewer" src="" style="display: none;"></iframe>
                 </div>
             </div>
 
