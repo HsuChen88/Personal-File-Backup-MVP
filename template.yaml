@@ -146,6 +146,7 @@ Resources:
             - Effect: Allow
               Action:
                 - sns:Publish
+                - sns:Subscribe
               Resource: !Ref SNSTopic
       Events:
         ApiPOSTsharefile:
