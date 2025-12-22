@@ -136,6 +136,8 @@ function handleRegisterSubmit(e) {
 
     userPool.signUp(email, password, attributeList, null, function(err, result) {
         if (err) {
+            console.error('Sign up failed:', err);        // <--- 確保有這行
+            alert(err.message || JSON.stringify(err));   // <--- 顯示具體錯誤
             if (err.code === 'UsernameExistsException') {
                 showToast('ℹ️', 'Account exists. Redirecting to verification...');
                 showConfirmSection(email);

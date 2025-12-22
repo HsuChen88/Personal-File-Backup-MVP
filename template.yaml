@@ -1,8 +1,7 @@
 ﻿AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Dropbex MVP - Full Stack Architecture
-  S3 Storage + Cognito Auth + Python Lambda (Groq AI)
+  Dropbex MVP - S3 + Cognito + Groq Summary + Recycle-bin API
 
 Parameters:
   AppName:
@@ -12,17 +11,26 @@ Parameters:
   GroqApiKey:
     Type: String
     NoEcho: true
+    Default: ""
     Description: 請輸入您的 Groq API Key (用於 llama-3.1-8b-instant)
 
 Resources:
   # ==========================================
-  # 1. S3 儲存桶 (儲存個人與公共檔案)
+  # 1. S3 儲存桶 (給 Summary 用)
   # ==========================================
   StorageBucket:
     Type: AWS::S3::Bucket
     Properties:
-      # 使用 AccountId 確保名稱在全球 S3 中不重複
       BucketName: !Sub ${AppName}-storage-${AWS::AccountId}
+      VersioningConfiguration:          # ← 新增版本化設定
+        Status: Enabled
+      # ✅ 新增這段 Lifecycle 規則
+      LifecycleConfiguration:
+        Rules:
+          - Id: AutoDeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
@@ -32,14 +40,13 @@ Resources:
             MaxAge: 3000
 
   # ==========================================
-  # 2. Lambda - Groq AI 摘要生成器 (Python)
+  # 2. Groq AI 摘要 Lambda (Python)
   # ==========================================
   SummaryFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: backend/
-      # [已修正] 指向 summary_handler.py 內的 lambda_handler 函數
-      Handler: summary_handler.lambda_handler 
+      Handler: summary_handler.lambda_handler
       Runtime: python3.11
       Timeout: 60
       MemorySize: 256
@@ -64,7 +71,7 @@ Resources:
                     Value: uploads/
 
   # ==========================================
-  # 3. Cognito - 使用者驗證系統
+  # 3. Cognito 使用者驗證
   # ==========================================
   UserPool:
     Type: AWS::Cognito::UserPool
@@ -89,9 +96,6 @@ Resources:
         - ClientId: !Ref UserPoolClient
           ProviderName: !GetAtt UserPool.ProviderName
 
-  # ==========================================
-  # 4. IAM Role - 授權前端 JS 直接存取 S3
-  # ==========================================
   CognitoAuthRole:
     Type: AWS::IAM::Role
     Properties:
@@ -116,7 +120,7 @@ Resources:
                   - s3:GetObject
                   - s3:ListBucket
                   - s3:DeleteObject
-                Resource: 
+                Resource:
                   - !Sub arn:aws:s3:::${StorageBucket}
                   - !Sub arn:aws:s3:::${StorageBucket}/*
 
@@ -127,14 +131,132 @@ Resources:
       Roles:
         authenticated: !GetAtt CognitoAuthRole.Arn
 
-# ==========================================
-# 5. 輸出結果 (部署完後請複製到 js/config.js)
-# ==========================================
+  # ==========================================
+  # 4. 「可刪除/可還原」專用 S3 + API + Lambda
+  #    （這是你前端現在用的 Recycle Bin 架構）
+  # ==========================================
+
+  # 4.2 API Gateway
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub "${AWS::StackName}-Api"
+      StageName: Prod
+      Cors:
+        AllowMethods: "'POST,OPTIONS,GET'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowOrigin: "'*'"
+      EndpointConfiguration: REGIONAL
+      TracingEnabled: true
+
+  # 4.3 RequestUploadHandler：產生 Presigned URL，上傳檔案到 StorageBucket/ uploads/{user}/...
+  RequestUploadHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/RequestUploadHandler
+      Handler: index.handler
+      Runtime: nodejs22.x
+      MemorySize: 256
+      Timeout: 10
+      Tracing: Active
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref StorageBucket
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+              Resource:
+                - !Sub arn:${AWS::Partition}:s3:::${StorageBucket}/*
+      Events:
+        ApiPOSTrequestupload:
+          Type: Api
+          Properties:
+            Path: /request-upload
+            Method: POST
+            RestApiId: !Ref Api
+
+  # 4.4 ListFilesHandler：列出正常檔案 + Delete Marker（軟刪除）
+  ListFilesHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/ListFilesHandler
+      Handler: index.handler
+      Runtime: nodejs22.x
+      MemorySize: 256
+      Timeout: 15
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref StorageBucket 
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:ListBucket
+                - s3:GetObject
+                - s3:ListBucketVersions
+                - s3:GetObjectVersion
+              Resource:
+                - !Sub "arn:${AWS::Partition}:s3:::${StorageBucket}"
+                - !Sub "arn:${AWS::Partition}:s3:::${StorageBucket}/*"
+      Events:
+        ApiGETfiles:
+          Type: Api
+          Properties:
+            Path: /files
+            Method: GET
+            RestApiId: !Ref Api
+
+  # 4.5 DeleteRestoreHandler：軟刪除 = 新增 Delete Marker；還原 = 刪除 Delete Marker
+  DeleteRestoreHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/DeleteRestoreHandler
+      Handler: index.handler
+      Runtime: nodejs22.x
+      MemorySize: 256
+      Timeout: 15
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref StorageBucket
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:DeleteObject
+                - s3:DeleteObjectVersion
+                - s3:ListObjectVersions
+                - s3:GetObjectVersion
+                - s3:GetObject
+              Resource:
+                - !Sub "arn:${AWS::Partition}:s3:::${StorageBucket}/*"
+      Events:
+        ApiPOSTdelete:
+          Type: Api
+          Properties:
+            Path: /delete
+            Method: POST
+            RestApiId: !Ref Api
+        ApiPOSTrestore:
+          Type: Api
+          Properties:
+            Path: /restore
+            Method: POST
+            RestApiId: !Ref Api
+
 Outputs:
   Region:
     Value: !Ref AWS::Region
-  S3BucketName:
+  StorageBucketName:
     Value: !Ref StorageBucket
+  ApiUrl:
+    Description: "Recycle-bin API Gateway URL"
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/Prod"
   UserPoolId:
     Value: !Ref UserPool
   UserPoolClientId:

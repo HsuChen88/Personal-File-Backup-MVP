@@ -14,7 +14,7 @@ function ensureAWSCredentials() {
         AWS.config.credentials = null;
         return false;
     }
-
+    console.log(`cognito-idp.${AWS_CONFIG.region}.amazonaws.com/${AWS_CONFIG.userPoolId}`);
     AWS.config.region = AWS_CONFIG.region;
     AWS.config.credentials = new AWS.CognitoIdentityCredentials({
         IdentityPoolId: AWS_CONFIG.identityPoolId,
@@ -109,48 +109,58 @@ async function refreshAllDashboards() {
 /**
  * 讀取 My Collection (S3 個人區)
  */
-function refreshFileDashboard() {
-    const container = document.getElementById('fileDashboardList');
-    if (!container) return;
+async function refreshFileDashboard() {
+  console.log('Refreshing dashboard...', 'API:', AWS_CONFIG.ApiUrl);
+  
+  const container = document.getElementById('fileDashboardList');
+  if (!container) return;
 
-    let userEmail = AppState.currentUserEmail || document.getElementById('statusBarEmail')?.innerText;
-    
-    // 嚴格檢查 Email 格式
-    if (!userEmail || !userEmail.includes('@') || userEmail.includes('user@')) return;
+  if (!AppState.isLoggedIn) {
+    container.innerHTML = '<div class="empty-state">請先登入</div>';
+    return;
+  }
 
-    const s3 = new AWS.S3();
-    const userPrefix = `uploads/${userEmail}/`;
-    
-    container.innerHTML = '<div class="loading-state">⏳ 讀取個人收藏...</div>';
+  // 1. 取得使用者 Email 並建立 prefix
+  const userEmail = AppState.currentUserEmail || document.getElementById('statusBarEmail')?.innerText;
+  if (!userEmail || !userEmail.includes('@')) {
+      container.innerHTML = '<div class="empty-state">無法識別使用者 Email</div>';
+      return;
+  }
+  const prefix = `uploads/${userEmail}/`;
 
-    s3.listObjectsV2({ Bucket: AWS_CONFIG.s3BucketName, Prefix: userPrefix }, (err, data) => {
-        if (err) {
-            console.error("❌ 個人區讀取失敗:", err);
-            // 處理憑證過期錯誤
-            if (err.code === 'CredentialsError' || err.statusCode === 400 || err.statusCode === 403) {
-                container.innerHTML = `
-                    <div class="error-state">
-                        ⚠️ 連線逾時<br>
-                        <button onclick="window.location.reload()" style="margin-top:10px; padding:5px 10px; cursor:pointer;">重整頁面</button>
-                    </div>`;
-            } else {
-                container.innerHTML = `<div class="error-state">Error: ${err.message}</div>`;
-            }
-            return;
-        }
+  container.innerHTML = '<div class="loading-state">載入中...</div>';
 
-        // 過濾掉資料夾本身與系統檔案
-        const files = data.Contents ? data.Contents.filter(item => 
-            item.Key !== userPrefix && !item.Key.endsWith('_summary.txt')
-        ) : [];
-
-        if (files.length === 0) {
-            container.innerHTML = '<div class="empty-state-gray">目前沒有資料</div>';
-            return;
-        }
-        renderUserFileList(files, userPrefix);
+  try {
+    // ✅ 修正點：API 請求加上 ?prefix=
+    const response = await fetch(`${AWS_CONFIG.ApiUrl}/files?prefix=${encodeURIComponent(prefix)}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': localStorage.getItem('idToken')
+      }
     });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('API Response:', data);
+    const files = data.files;
+
+    if (files.length === 0) {
+      container.innerHTML = '<div class="empty-state">無檔案</div>';
+      return;
+    }
+
+    // ✅ 使用正確的渲染函數
+    renderUserFileList(files, prefix);
+
+  } catch (err) {
+    console.error('List files failed:', err);
+    container.innerHTML = `<div class="error-state">載入失敗: ${err.message}</div>`;
+  }
 }
+
 
 /**
  * 讀取 Public Repository (S3 公共區)
@@ -312,30 +322,49 @@ function renderUserFileList(files, prefix) {
     container.innerHTML = ''; 
     files.sort((a, b) => b.LastModified - a.LastModified);
 
-    files.forEach(file => {
+    files
+        .filter(file => !file.Key.endsWith('/')) // ✅ 過濾掉資料夾本身
+        .forEach(file => {
+        // ✅ 支援 isDeleted
+        const isDeleted = file.isDeleted || false;
         const fileName = file.Key.replace(prefix, '');
         const fileSize = formatFileSize(file.Size);
         const safeKey = file.Key.replace(/'/g, "\\'"); 
         const icon = getFileIcon(fileName);
 
+        // ✅ 動態生成狀態標籤
+        const statusTag = isDeleted 
+            ? `<span class="status-tag status-deleted" style="background:#fee2e2; color:#dc2626;">Deleted</span>`
+            : `<span class="status-tag status-stored">Stored</span>`;
+
+        // ✅ 動態生成按鈕：刪除 vs 恢復
+        // 注意：恢復需要 versionId
+        const actionBtn = isDeleted
+            ? `<button class="action-btn restore" title="Restore" style="color: green;" onclick="handleRestore('${safeKey}', '${file.VersionId}')">↩</button>`
+            : `<button class="action-btn delete" title="Delete" onclick="handleDeleteFile('${safeKey}')">✕</button>`;
+
+        // ✅ 樣式調整：已刪除則半透明 + 刪除線
+        const rowStyle = isDeleted ? 'opacity: 0.7; background: #f9fafb;' : 'cursor: pointer;';
+        const titleStyle = isDeleted ? 'text-decoration: line-through; color: #888;' : '';
+
         const html = `
-            <div class="file-row" onclick="handleViewFile('${safeKey}')" style="cursor: pointer;">
+            <div class="file-row" style="${rowStyle}" ${isDeleted ? '' : `onclick="handleViewFile('${safeKey}')"`}>
                 <div class="file-content-top">
                     <div class="file-icon">${icon}</div>
                     <div class="file-info">
-                        <div class="file-title" title="${fileName}">${fileName}</div>
+                        <div class="file-title" style="${titleStyle}" title="${fileName}">${fileName}</div>
                         <div class="file-meta">
-                            <span class="status-tag status-stored">Stored</span>
+                            ${statusTag}
                             ${fileSize}
                         </div>
                     </div>
                 </div>
                 
                 <div class="file-actions" onclick="event.stopPropagation();">
-                    <button class="action-btn ai-summary" title="AI Summary" style="color: #f59e0b;" onclick="handleViewSummary('${safeKey}')">✨</button>
-                    <button class="action-btn publish" title="Publish to Public" style="color: #3b82f6;" onclick="handlePublishToPublic('${safeKey}')">🌍</button>
-                    <button class="action-btn share" title="Share (Dev)" onclick="handleTeamShare('${safeKey}')">➦</button>
-                    <button class="action-btn delete" title="Delete" onclick="handleDeleteFile('${safeKey}')">✕</button>
+                    ${!isDeleted ? `<button class="action-btn ai-summary" title="AI Summary" style="color: #f59e0b;" onclick="handleViewSummary('${safeKey}')">✨</button>` : ''}
+                    ${!isDeleted ? `<button class="action-btn publish" title="Publish to Public" style="color: #3b82f6;" onclick="handlePublishToPublic('${safeKey}')">🌍</button>` : ''}
+                    ${!isDeleted ? `<button class="action-btn share" title="Share (Dev)" onclick="handleTeamShare('${safeKey}')">➦</button>` : ''}
+                    ${actionBtn}
                 </div>
             </div>
         `;
@@ -488,18 +517,60 @@ function handleTeamShare(s3Key) {
     showToast('ℹ️', 'Share 功能由其他小組成員開發中');
 }
 
+
+// ✅ 修正為（調用 API）
 async function handleDeleteFile(s3Key) {
-    if (!confirm('永久刪除此檔案？')) return;
-    if (!ensureAWSCredentials()) return;
+  const fileName = s3Key.split('/').pop(); 
+    // ✅ 修改確認提示
+  if (!confirm(`確定要刪除 "${fileName}" 嗎？\n\n注意：檔案將移至回收區，並在 30 天後自動永久刪除。`)) return;
+  showToast('🗑️', '正在移至回收區...');
+  try {
+    const response = await fetch(`${AWS_CONFIG.ApiUrl}/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: s3Key })
+    });
     
-    const s3 = new AWS.S3();
-    try {
-        await s3.deleteObject({ Bucket: AWS_CONFIG.s3BucketName, Key: s3Key }).promise();
-        try { await s3.deleteObject({ Bucket: AWS_CONFIG.s3BucketName, Key: s3Key + "_summary.txt" }).promise(); } catch(e){}
-        showToast('✅', '刪除成功');
-        refreshFileDashboard(); 
-    } catch (err) { showToast('❌', '刪除失敗'); }
+    if (response.ok) {
+      showToast('✅', '檔案已移至回收區 (30天保留期)');
+      refreshFileDashboard();  // 重新載入，顯示 Delete Marker
+    } else {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || '刪除失敗');
+    }
+  } catch (error) {
+    showToast('❌','刪除錯誤: ' + error.message);
+  }
 }
+
+async function handleRestore(key, versionId) {
+if (!confirm('確定要還原此檔案嗎？')) return;
+  if (!versionId) {
+    showToast('缺少版本 ID');
+    return;
+  }
+  showToast('⏳', '正在還原檔案...');
+  try {
+    const response = await fetch(`${AWS_CONFIG.ApiUrl}/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        key: key, 
+        versionId: versionId 
+      })
+    });
+    
+    if (response.ok) {
+       showToast('✅', '檔案已成功還原');
+      refreshFileDashboard();
+    } else {
+      throw new Error('還原失敗');
+    }
+  } catch (error) {
+    showToast('❌', '還原錯誤: ' + error.message);
+  }
+}
+
 
 async function handleDownloadFile(s3Key) {
     if (!ensureAWSCredentials()) return;

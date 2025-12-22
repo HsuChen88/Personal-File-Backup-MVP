@@ -1,0 +1,14 @@
+{
+  "name": "delete-restore-handler",
+  "version": "1.0.0",
+  "description": "Lambda function for soft deleting and restoring S3 files",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.0.0"
+  }
+}
