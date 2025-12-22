@@ -1,4 +1,4 @@
-const { SNSClient, PublishCommand } = require('@aws-sdk/client-sns');
+const { SNSClient, PublishCommand, SubscribeCommand } = require('@aws-sdk/client-sns');
 
 const snsClient = new SNSClient({ region: process.env.AWS_REGION || 'us-east-1' });
 
@@ -86,6 +86,42 @@ exports.handler = async (event) => {
             };
         }
         
+        // 嘗試訂閱 email 到 SNS Topic（如果還沒訂閱）
+        let subscriptionStatus = 'unknown';
+        try {
+            const subscribeParams = {
+                TopicArn: topicArn,
+                Protocol: 'email',
+                Endpoint: recipientEmail
+            };
+            
+            const subscribeResponse = await snsClient.send(new SubscribeCommand(subscribeParams));
+            subscriptionStatus = 'subscribed';
+            console.log('Email subscription attempted:', {
+                email: recipientEmail,
+                subscriptionArn: subscribeResponse.SubscriptionArn,
+                status: 'new_subscription'
+            });
+        } catch (subscribeError) {
+            // 如果已經訂閱或訂閱失敗，記錄但不中斷流程
+            if (subscribeError.name === 'SubscriptionLimitExceeded' || 
+                subscribeError.message?.includes('already exists') ||
+                subscribeError.message?.includes('already subscribed')) {
+                subscriptionStatus = 'already_subscribed';
+                console.log('Email already subscribed:', {
+                    email: recipientEmail,
+                    status: 'already_subscribed'
+                });
+            } else {
+                subscriptionStatus = 'subscription_failed';
+                console.warn('Email subscription failed (will still attempt to send):', {
+                    email: recipientEmail,
+                    error: subscribeError.message,
+                    status: 'subscription_failed'
+                });
+            }
+        }
+        
         // 準備 SNS 訊息內容
         const shareMessage = {
             event: 'file_shared',
@@ -130,6 +166,7 @@ Timestamp: ${new Date().toISOString()}`;
             fileName: fileName,
             recipientEmail: recipientEmail,
             messageId: snsResponse.MessageId,
+            subscriptionStatus: subscriptionStatus,
             timestamp: new Date().toISOString(),
             requestId: event.requestContext?.requestId
         });
@@ -144,7 +181,13 @@ Timestamp: ${new Date().toISOString()}`;
                 message: 'File share notification sent successfully',
                 messageId: snsResponse.MessageId,
                 fileName: fileName,
-                recipientEmail: recipientEmail
+                recipientEmail: recipientEmail,
+                subscriptionStatus: subscriptionStatus,
+                note: subscriptionStatus === 'subscribed' 
+                    ? 'Email has been subscribed to receive notifications. Please check inbox for confirmation email.'
+                    : subscriptionStatus === 'already_subscribed'
+                    ? 'Email is already subscribed.'
+                    : 'Email subscription attempted. Please ensure email is subscribed to receive notifications.'
             })
         };
         
