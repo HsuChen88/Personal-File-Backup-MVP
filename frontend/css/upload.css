@@ -1,75 +1,24 @@
-/* Upload Section Styles */
-.upload-card {
-    position: relative;
-    min-height: 400px;
-}
-
-.upload-card.in-grid {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
-    max-height: 100%;
-    overflow: hidden;
-}
+/* Upload Section Styles - 學術論文版 */
 
 .upload-section {
     flex: 0 0 auto;
     min-height: 0;
-    margin-bottom: 20px;
+    /* 移除底部外距，由卡片的 padding 控制間距 */
+    margin-bottom: 0; 
 }
 
 .upload-section-title {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
     color: #374151;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
 }
 
-.upload-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10;
-    backdrop-filter: blur(2px);
-}
-
-.upload-overlay.hidden {
-    display: none;
-}
-
-.upload-overlay-content {
-    text-align: center;
-    color: #6b7280;
-}
-
-.upload-overlay-content .overlay-title {
-    font-size: 16px;
-    font-weight: 500;
-    margin-bottom: 5px;
-}
-
-.upload-overlay-content .overlay-subtitle {
-    font-size: 14px;
-}
-
-.upload-overlay-icon {
-    font-size: 48px;
-    margin-bottom: 15px;
-    opacity: 0.5;
-}
-
+/* 拖放區域 (灰框) */
 .dropzone {
-    border: 3px dashed #d1d5db;
+    border: 2px dashed #d1d5db;
     border-radius: 12px;
-    padding: 40px 20px;
+    padding: 25px 15px;
     text-align: center;
     transition: all 0.3s;
     cursor: pointer;
@@ -92,19 +41,19 @@
 }
 
 .dropzone-icon {
-    font-size: 48px;
-    margin-bottom: 15px;
+    font-size: 32px;
+    margin-bottom: 8px;
 }
 
 .dropzone-text {
-    font-size: 18px;
+    font-size: 14px;
     color: #374151;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     font-weight: 500;
 }
 
 .dropzone-subtext {
-    font-size: 14px;
+    font-size: 12px;
     color: #6b7280;
 }
 
@@ -112,104 +61,89 @@
     display: none;
 }
 
-/* Progress Section */
+/* 進度條區域 (核心修正區) */
 .progress-section {
-    visibility: hidden;
-    margin-top: 30px;
-    height: 300px;
+    display: none; /* 預設完全不佔用空間，解決卡片過長問題 */
+    margin-top: 15px; /* 與灰框保持間距 */
+    max-height: 150px;
     overflow-y: auto;
-    padding-right: 8px;
-    flex-shrink: 0;
-    flex: 0 0 300px;
-    min-height: 300px;
-    max-height: 300px;
+    padding-right: 5px;
 }
 
+/* 當有檔案上傳，JavaScript 會加上此類別 */
 .progress-section.visible {
-    visibility: visible;
+    display: block;
 }
 
+/* 自定義捲軸 */
 .progress-section::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
 }
-
 .progress-section::-webkit-scrollbar-track {
     background: #f1f1f1;
     border-radius: 10px;
 }
-
 .progress-section::-webkit-scrollbar-thumb {
     background: #d1d5db;
     border-radius: 10px;
 }
 
-.progress-section::-webkit-scrollbar-thumb:hover {
-    background: #9ca3af;
-}
-
-.progress-section #fileList {
-    min-height: 0;
-    max-height: 100%;
-    overflow: visible;
-}
-
+/* 上傳中的檔案項目 */
 .file-item {
-    margin-bottom: 20px;
-    padding: 15px;
-    background: #f9fafb;
+    margin-bottom: 10px;
+    padding: 10px;
+    background: #f8fafc;
+    border: 1px solid #f1f5f9;
     border-radius: 8px;
 }
 
 .file-name {
+    font-size: 13px;
     font-weight: 500;
     color: #374151;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
     display: flex;
-    align-items: center;
-    gap: 8px;
-    max-width: 100%;
-    word-wrap: break-word;
-    word-break: break-word;
-    overflow-wrap: break-word;
-}
-
-.file-name span:first-child {
-    flex: 0 0 auto;
-}
-
-.file-name span:nth-child(2) {
-    flex: 1 1 0;
-    min-width: 0;
-    word-wrap: break-word;
-    word-break: break-word;
-    overflow-wrap: break-word;
-}
-
-.file-name span:last-child {
-    flex: 0 0 90px;
+    justify-content: space-between;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
-    margin-left: auto;
-    text-align: right;
 }
 
+/* 進度條外框 */
 .progress-bar-container {
     background: #e5e7eb;
-    height: 8px;
-    border-radius: 4px;
+    height: 6px;
+    border-radius: 3px;
     overflow: hidden;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
 }
 
+/* 進度條本體 - 保持 Dropbex 紫金漸層感 */
 .progress-bar {
     height: 100%;
     background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    width: 0%;
     transition: width 0.3s;
-    border-radius: 4px;
 }
 
 .progress-text {
-    font-size: 12px;
-    color: #6b7280;
+    font-size: 11px;
+    color: #94a3b8;
     text-align: right;
 }
 
+/* 遮罩設定 (未登入時) */
+.upload-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    backdrop-filter: blur(2px);
+}

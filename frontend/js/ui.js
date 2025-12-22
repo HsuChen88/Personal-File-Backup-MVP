@@ -81,4 +81,3 @@ function initRestoreModal() {
         }, 1500);
     });
 }
-

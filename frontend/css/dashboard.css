@@ -1,341 +1,267 @@
-/* Dashboard Styles */
-.dashboard-card {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
-    max-height: 100%;
-    overflow: hidden;
-}
+/* Dashboard Styles - 檔案列表與元件設計 (強制單行圖示版) */
 
-.dashboard-card .section-title {
-    flex: 0 0 auto;
-    min-height: 0;
-}
-
-.dashboard-card .file-list {
-    flex: 1 1 0;
-    min-height: 0;
-    max-height: 100%;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding-right: 8px;
-}
-
-.dashboard-card .file-list::-webkit-scrollbar {
-    width: 8px;
-}
-
-.dashboard-card .file-list::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 10px;
-}
-
-.dashboard-card .file-list::-webkit-scrollbar-thumb {
-    background: #d1d5db;
-    border-radius: 10px;
-}
-
-.dashboard-card .file-list::-webkit-scrollbar-thumb:hover {
-    background: #9ca3af;
-}
-
-.section-title {
-    font-size: 18px;
-    font-weight: 600;
-    color: #374151;
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.section-title .sync-time {
-    font-size: 12px;
-    font-weight: normal;
-    color: #6b7280;
-}
-
+/* --- 檔案列表容器 --- */
 .file-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 5px;
+    margin-top: 10px;
+    min-height: 0;
+    width: 100%; 
 }
 
+/* --- 檔案列 (垂直分層設計) --- */
 .file-row {
     display: flex;
-    align-items: center;
-    padding: 16px;
+    flex-direction: column; /* 垂直堆疊 */
+    width: 100%;            
+    padding: 12px;
+    border: 1px solid #f1f5f9;
+    border-radius: 8px;
+    margin-bottom: 10px;
     background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    gap: 15px;
+    transition: all 0.2s;
+    overflow: hidden;
+    align-items: flex-start;
 }
 
 .file-row:hover {
-    border-color: #a5b4fc;
-    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
-    transform: translateY(-2px);
+    background-color: #f8fafc;
+    border-color: #e2e8f0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+/* 上層：圖示 + 資訊 */
+.file-content-top {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    width: 100%;
+    min-width: 0; /* 關鍵：允許縮小 */
+    margin-bottom: 8px;    
 }
 
 .file-icon {
     font-size: 24px;
-    flex: 0 0 auto;
+    flex-shrink: 0;
 }
 
 .file-info {
-    flex: 1 1 0;
-    min-width: 0;
-    overflow: hidden;
+    flex: 1;                
+    min-width: 0; /* 關鍵：觸發文字截斷 */
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: left;
 }
 
+/* --- 檔名特效 (單行 + 漸層淡出) --- */
 .file-title {
-    font-weight: 500;
-    color: #1f2937;
-    font-size: 15px;
-    max-width: 100%;
-    word-wrap: break-word;
-    word-break: break-word;
-    overflow-wrap: break-word;
+    font-size: 14px;
+    font-weight: 600;
+    color: #334155;
+    white-space: nowrap;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    display: block;
+    width: 100%;
 }
 
 .file-meta {
-    font-size: 13px;
-    color: #6b7280;
-    margin-top: 2px;
-    max-width: 100%;
-    word-wrap: break-word;
-    word-break: break-word;
-    overflow-wrap: break-word;
-}
-
-.file-status {
-    padding: 4px 12px;
-    border-radius: 20px;
     font-size: 12px;
-    font-weight: 500;
-    flex: 0 0 auto;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    gap: 6px;
     white-space: nowrap;
+    overflow: hidden;
 }
 
-.status-normal {
+/* --- 狀態標籤 --- */
+.status-tag {
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 10px;
     background: #ecfdf5;
     color: #059669;
+    border: 1px solid #a7f3d0;
+    flex-shrink: 0;
 }
 
-.status-deleted {
-    background: #fef2f2;
-    color: #dc2626;
-}
-
-.status-expired {
-    background: #f3f4f6;
-    color: #6b7280;
-}
-
-/* File Action Buttons */
+/* --- 下層：操作按鈕區 (關鍵修正) --- */
 .file-actions {
     display: flex;
-    gap: 10px;
-    align-items: center;
-    flex: 0 0 auto;
+    /* 改為 Space-between 讓按鈕平均分散，或者 flex-end 靠右 */
+    justify-content: flex-end; 
+    
+    /* ★★★ 強制不換行 ★★★ */
+    flex-wrap: nowrap !important;
+    
+    gap: 6px; /* 按鈕之間的間距 */
+    width: 100%;
+    padding-top: 8px;
+    border-top: 1px dashed #f1f5f9; 
+    overflow: visible; /* 確保陰影不被切掉 */
 }
 
+/* 按鈕樣式：改為方形圖示按鈕 */
 .action-btn {
-    display: inline-flex;
+    /* 設定固定寬高，確保四個按鈕能塞進一行 */
+    width: 32px; 
+    height: 32px;
+    padding: 0; /* 移除內距，讓 Icon 居中 */
+    
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    cursor: pointer;
+    font-size: 14px;
+    
+    /* Flex 居中大法 */
+    display: flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    background: white;
-    border: 2px solid #667eea;
-    color: #667eea;
+    
+    transition: all 0.2s;
+    flex: 0 0 auto; /* 禁止按鈕縮小 */
+}
+
+.action-btn:hover { 
+    background: #f1f5f9; 
+    border-color: #cbd5e1; 
+    transform: translateY(-1px); 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* --- 登出與使用者資訊 --- */
+.user-info { font-size: 13px; color: #4b5563; }
+#statusBarEmail { font-weight: 500; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.logout-btn-compact {
+    width: 100%;
+    background-color: #ffffff;
+    color: #4b5563;
+    border: 1px solid #e5e7eb;
+    padding: 8px 0;
     border-radius: 8px;
-    font-weight: 500;
-    font-size: 18px;
-    cursor: pointer;
-    transition: all 0.3s;
-    position: relative;
-    overflow: visible;
-}
-
-.action-btn:hover {
-    background: #667eea;
-    color: white;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-}
-
-.action-btn:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
-}
-
-.action-btn.download {
-    border-color: #3b82f6;
-    color: #3b82f6;
-}
-
-.action-btn.download:hover {
-    background: #3b82f6;
-    border-color: #3b82f6;
-    color: white;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-}
-
-.action-btn.share {
-    border-color: #10b981;
-    color: #10b981;
-}
-
-.action-btn.share:hover {
-    background: #10b981;
-    border-color: #10b981;
-    color: white;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
-}
-
-.action-btn.delete {
-    border-color: #ef4444;
-    color: #ef4444;
-}
-
-.action-btn.delete:hover {
-    background: #ef4444;
-    border-color: #ef4444;
-    color: white;
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
-}
-
-.restore-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    background: white;
-    border: 2px solid #667eea;
-    color: #667eea;
-    border-radius: 8px;
-    font-weight: 500;
-    font-size: 18px;
-    cursor: pointer;
-    transition: all 0.3s;
-    position: relative;
-    overflow: visible;
-}
-
-.restore-btn:hover {
-    background: #667eea;
-    color: white;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-}
-
-.restore-btn:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
-}
-
-/* Tooltip for buttons */
-.action-btn::before,
-.restore-btn::before {
-    content: attr(data-tooltip);
-    position: absolute;
-    bottom: calc(100% + 10px);
-    left: 50%;
-    transform: translateX(-50%) translateY(-5px);
-    background: #1f2937;
-    color: white;
-    padding: 8px 14px;
-    border-radius: 8px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
-    white-space: nowrap;
-    opacity: 0;
-    pointer-events: none;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 100;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.logout-btn-compact:hover { background-color: #fef2f2; color: #ef4444; border-color: #fca5a5; }
+
+/* Dashboard Styles - 閱讀器元件 (從 HTML 移入) */
+
+/* 閱讀器卡片：修正 Flex 屬性以填滿空間 */
+.viewer-card {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 !important; /* 移除內距讓 iframe 滿版 */
+    min-height: 0;
+    overflow: hidden;
 }
 
-.action-btn::after,
-.restore-btn::after {
-    content: '';
-    position: absolute;
-    bottom: calc(100% + 3px);
-    left: 50%;
-    transform: translateX(-50%) translateY(-5px);
-    border: 7px solid transparent;
-    border-top-color: #1f2937;
-    opacity: 0;
-    pointer-events: none;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 100;
+/* 閱讀器標題列 */
+.viewer-header {
+    background: #f8fafc;
+    padding: 10px 15px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: #334155;
+    flex: 0 0 auto; /* 防止被壓縮 */
 }
 
-.action-btn:hover::before,
-.action-btn:hover::after,
-.restore-btn:hover::before,
-.restore-btn:hover::after {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
+/* 關閉按鈕 */
+.close-viewer-btn {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+    color: #64748b;
 }
 
-.action-btn:hover::before,
-.restore-btn:hover::before {
-    animation: tooltipBounce 0.4s ease-out;
+.close-viewer-btn:hover {
+    background: #fef2f2;
+    color: #ef4444;
+    border-color: #fca5a5;
 }
 
-@keyframes tooltipBounce {
-    0% {
-        transform: translateX(-50%) translateY(-5px);
-        opacity: 0;
-    }
-    60% {
-        transform: translateX(-50%) translateY(2px);
-    }
-    100% {
-        transform: translateX(-50%) translateY(0);
-        opacity: 1;
-    }
+/* Iframe 預覽視窗 */
+#docViewer {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #f1f5f9;
+    display: none; /* 預設隱藏，由 JS 控制顯示 */
 }
 
-@media (max-width: 768px) {
-    .file-actions {
-        gap: 8px;
-    }
-
-    .action-btn,
-    .restore-btn {
-        width: 36px;
-        height: 36px;
-        font-size: 16px;
-    }
-
-    .file-row {
-        padding: 12px;
-    }
+/* 空狀態提示 */
+#viewerPlaceholder {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    background: #f8fafc;
 }
 
-@media (max-width: 480px) {
-    .file-row {
-        flex-wrap: wrap;
-        gap: 10px;
-    }
+/* --- Public Repository 搜尋欄修正 --- */
 
-    .file-info {
-        flex: 1 1 100%;
-    }
-
-    .file-actions {
-        margin-left: auto;
-    }
+/* 確保搜尋容器使用 Flex 排列 */
+.search-container {
+    display: flex !important;
+    gap: 6px !important;
+    margin-bottom: 12px !important;
+    width: 100%; /* 限制容器不超過父層 */
+    box-sizing: border-box;
 }
 
+/* 輸入框：佔據剩餘空間，但允許縮小 */
+#crawlerSearchInput {
+    flex: 1;       /* 自動填滿剩餘空間 */
+    min-width: 0;  /* ★關鍵：防止內容撐開導致溢出 */
+    width: 100%;   /* 重置寬度 */
+    margin-bottom: 0 !important;
+    padding: 6px 10px;
+    font-size: 13px;
+    height: 32px; /* 固定高度，對齊按鈕 */
+}
+
+/* 搜尋按鈕：固定大小，禁止被壓縮 */
+.search-container button {
+    flex: 0 0 auto; /* 禁止縮小 */
+    width: auto !important;
+    margin-top: 0 !important;
+    padding: 0 12px !important;
+    height: 32px; /* 固定高度 */
+    font-size: 13px;
+    white-space: nowrap; /* 文字不換行 */
+    
+    /* 美化按鈕 */
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.search-container button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}

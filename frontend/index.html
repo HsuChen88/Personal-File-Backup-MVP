@@ -5,11 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dropbex - Upload once, backed up automatically</title>
-    
-    <!-- CSS Files -->
+
+    <link rel="icon" type="image/png" href="images/favicon.png">
+    <link rel="apple-touch-icon" href="images/favicon.png">
+
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
-    <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/auth.css">
     <link rel="stylesheet" href="css/upload.css">
     <link rel="stylesheet" href="css/dashboard.css">
@@ -17,29 +18,12 @@
 
 <body>
     <div class="container">
-        <!-- Header -->
         <div class="header">
             <div class="logo">📦 Dropbex</div>
             <div class="tagline">Upload once, backed up automatically.</div>
         </div>
 
-        <!-- Logged In Status Bar (Only shown after login) -->
-        <div class="status-bar" id="statusBar">
-            <div class="status-bar-left">
-                <div class="status-bar-icon">✓</div>
-                <div class="status-bar-info">
-                    <h3>Logged In</h3>
-                    <p id="statusBarEmail">user@example.com</p>
-                </div>
-            </div>
-            <button class="logout-btn" onclick="handleLogout()">
-                Logout
-            </button>
-        </div>
-
-        <!-- Main Grid: Auth + Upload (Before Login) -->
         <div class="main-grid" id="mainGrid">
-            <!-- Left: Authentication Card -->
             <div class="card auth-card" id="authCard">
                 <div id="authFormSection">
                     <div class="auth-tabs">
@@ -47,139 +31,148 @@
                         <button class="auth-tab" onclick="switchTab('register')">Register</button>
                     </div>
 
-                    <!-- Login Form -->
                     <form class="auth-form active" id="loginForm" onsubmit="handleLoginSubmit(event)">
                         <div class="form-group">
                             <label class="form-label">Email Address</label>
-                            <input type="email" class="form-input" id="loginEmail" placeholder="user@example.com" required>
-                            <div class="form-error" id="loginEmailError">Please enter a valid email</div>
+                            <input type="email" class="form-input" id="loginEmail" autocomplete="username" placeholder="user@example.com" required>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Password</label>
-                            <input type="password" class="form-input" id="loginPassword" placeholder="••••••••" required>
-                            <div class="form-error" id="loginPasswordError">Password is required</div>
+                            <input type="password" class="form-input" id="loginPassword" autocomplete="current-password" placeholder="••••••••" required>
                         </div>
-                        <button type="submit" class="submit-btn" id="loginSubmitBtn">
-                            Login
-                        </button>
+                        <button type="submit" class="submit-btn" id="loginSubmitBtn">Login</button>
                     </form>
 
-                    <!-- Register Form -->
                     <form class="auth-form" id="registerForm" onsubmit="handleRegisterSubmit(event)">
                         <div class="form-group">
                             <label class="form-label">Email Address</label>
-                            <input type="email" class="form-input" id="registerEmail" placeholder="user@example.com" required>
-                            <div class="form-error" id="registerEmailError">Please enter a valid email</div>
+                            <input type="email" class="form-input" id="registerEmail" autocomplete="username" placeholder="user@example.com" required>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Password</label>
-                            <input type="password" class="form-input" id="registerPassword" placeholder="At least 8 characters" required minlength="8">
-                            <div class="form-error" id="registerPasswordError">Password must be at least 8 characters</div>
+                            <input type="password" class="form-input" id="registerPassword" autocomplete="new-password" required minlength="8">
                         </div>
                         <div class="form-group">
                             <label class="form-label">Confirm Password</label>
-                            <input type="password" class="form-input" id="registerConfirmPassword" placeholder="Re-enter password" required>
-                            <div class="form-error" id="registerConfirmPasswordError">Passwords do not match</div>
+                            <input type="password" class="form-input" id="registerConfirmPassword" autocomplete="new-password" required>
                         </div>
-                        <button type="submit" class="submit-btn" id="registerSubmitBtn">
-                            Create Account
-                        </button>
+                        <button type="submit" class="submit-btn" id="registerSubmitBtn">Create Account</button>
                     </form>
-                </div>
-            </div>
 
-            <!-- Right: Upload Card (Before Login) -->
-            <div class="card upload-card" id="uploadCardBeforeLogin">
-                <!-- Overlay when not logged in -->
-                <div class="upload-overlay" id="uploadOverlay">
-                    <div class="upload-overlay-content">
-                        <div class="upload-overlay-icon">🔒</div>
-                        <div class="overlay-title">Login Required</div>
-                        <div class="overlay-subtitle">Please login or register to upload files</div>
-                    </div>
-                </div>
-
-                <div class="upload-section">
-                    <h2 class="upload-section-title">Upload Files</h2>
-                    <div class="dropzone disabled" id="dropzoneBeforeLogin" ondrop="handleDrop(event)"
-                        ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
-                        <div class="dropzone-icon">📤</div>
-                        <div class="dropzone-text">Drag & Drop Files Here</div>
-                        <div class="dropzone-subtext">Supported: All file types</div>
-                        <label for="fileInput" class="choose-file-btn">or Choose File</label>
-                        <input type="file" id="fileInput" class="file-input" multiple onchange="handleFileSelect(event)">
+                    <div id="confirmSection" style="display: none; margin-top: 20px;" class="auth-form">
+                        <div class="auth-header" style="text-align: center; margin-bottom: 15px;">
+                            <h3 style="color: #667eea;">Verify Your Email</h3>
+                            <p style="font-size: 14px; color: #6b7280;">Enter the 6-digit code sent to your email.</p>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Verification Code</label>
+                            <input type="text" class="form-input" id="confirmCode" placeholder="000000" maxlength="6">
+                        </div>
+                        <button type="button" class="submit-btn" id="confirmSubmitBtn" onclick="handleConfirmRegistration()">
+                            Confirm Account
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Logged In Grid: Upload + Dashboard (After Login) -->
-        <div class="logged-in-grid" id="loggedInGrid">
-            <!-- Left: Upload Card -->
-            <div class="card upload-card in-grid">
-                <div class="upload-section">
+        <div class="scholar-dashboard" id="loggedInGrid">
+            
+            <div class="dashboard-column-left">
+                <div class="card upload-card-new">
                     <h2 class="upload-section-title">Upload Files</h2>
-                    <div class="dropzone" id="dropzone" ondrop="handleDrop(event)"
-                        ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                    <div class="dropzone" id="dropzone" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
                         <div class="dropzone-icon">📤</div>
-                        <div class="dropzone-text">Drag & Drop Files Here</div>
-                        <div class="dropzone-subtext">Supported: All file types</div>
+                        <div class="dropzone-text">Drag & Drop Papers</div>
                         <label for="fileInputLoggedIn" class="choose-file-btn">or Choose File</label>
                         <input type="file" id="fileInputLoggedIn" class="file-input" multiple onchange="handleFileSelect(event)">
                     </div>
-
-                    <!-- Progress Section -->
-                    <div class="progress-section" id="progressSection">
+                    <div id="progressSection" class="progress-section">
                         <div id="fileList"></div>
                     </div>
                 </div>
+
+                <div class="card my-files-area">
+                    <div class="section-title" style="padding: 0 5px; font-weight: 600; color: #374151; margin-bottom: 10px; display: flex; justify-content: space-between;">
+                        <span>My Collection (S3)</span>
+                    </div>
+                    <div class="file-list" id="fileDashboardList">
+                        </div>
+                </div>
             </div>
 
-            <!-- Right: File Dashboard -->
-            <div class="card dashboard-card">
-                <div class="section-title">
-                    <span>My Secure Files</span>
-                    <span class="sync-time">Last synced: Just now</span>
+            <div class="dashboard-column-middle">
+                <div class="card viewer-card">
+                    <div class="viewer-header">
+                        <span id="currentViewingTitle">Document Viewer</span>
+                        <button class="close-viewer-btn" onclick="closeViewer()">Close</button>
+                    </div>
+                    
+                    <div id="viewerPlaceholder">
+                        <div style="text-align: center;">
+                            <div style="font-size: 40px; margin-bottom: 10px; opacity: 0.5;">📖</div>
+                            <div>請點擊檔案圖示開始預覽</div>
+                        </div>
+                    </div>
+                    
+                    <iframe id="docViewer" src=""></iframe>
                 </div>
-                <div class="file-list" id="fileDashboardList">
-                    <!-- Populated by JS -->
+            </div>
+
+            <div class="dashboard-column-right">
+                <div class="card logout-card">
+                    <div class="user-info">
+                        <span class="user-label">Logged in as:</span>
+                        <span id="statusBarEmail" style="font-weight: 600; color: #374151;">user@example.com</span>
+                    </div>
+                    <button class="logout-btn-compact" onclick="handleLogout()">Logout</button>
+                </div>
+
+                <div class="card public-repository-area">
+                    <h2 class="section-title" style="padding: 0 5px; font-weight: 600; color: #374151; margin-bottom: 10px;">Public Repository</h2>
+                    
+                    <div class="search-container" style="display: flex; gap: 5px; margin-bottom: 15px;">
+                        <input type="text" id="crawlerSearchInput" class="form-input" style="margin-bottom: 0;" placeholder="Search papers...">
+                        <button class="submit-btn" style="width: auto; padding: 0 15px; margin-top: 0;" onclick="handleCrawlerSearch()">Search</button>
+                    </div>
+
+                    <div class="file-list" id="publicFileList">
+                        <div class="empty-state-gray">目前沒有資料</div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Footer -->
-    <div class="footer">
-        <div class="footer-links">
-            <a href="#privacy">Privacy</a>
-            <a href="#architecture">Architecture</a>
-            <a href="#github">GitHub</a>
+        <div class="footer">
+            <div class="footer-links">
+                <a href="#">Privacy Policy</a>
+                <a href="#">Terms of Service</a>
+                <a href="#">GitHub</a>
+            </div>
+            <div class="footer-note">Powered by AWS S3 & Lambda. © 2025 Dropbex</div>
         </div>
-        <div class="footer-note">Your files are encrypted and securely backed up to AWS.</div>
     </div>
 
-    <!-- Restore Confirmation Modal -->
     <div class="modal-overlay" id="restoreModal">
         <div class="modal">
             <div class="modal-icon">↺</div>
             <div class="modal-title">Restore File?</div>
-            <div class="modal-text" id="restoreModalText">
-                Are you sure?
-            </div>
+            <div class="modal-text" id="restoreModalText">Are you sure you want to restore this file?</div>
             <div class="modal-actions">
                 <button class="btn-cancel" onclick="closeRestoreModal()">Cancel</button>
-                <button class="btn-confirm" id="confirmRestoreBtn">Confirm Restore</button>
+                <button class="btn-confirm" id="confirmRestoreBtn">Confirm</button>
             </div>
         </div>
     </div>
 
-    <!-- Toast Notification -->
     <div class="toast" id="toast">
         <span id="toastIcon">⚠️</span>
-        <span id="toastMessage">Error message</span>
+        <span id="toastMessage"></span>
     </div>
 
-    <!-- JavaScript Files -->
+    <script src="js/amazon-cognito-identity.min.js"></script>
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1500.0.min.js"></script>
+    <script src="js/config.js"></script>
     <script src="js/state.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/ui.js"></script>
@@ -188,5 +181,4 @@
     <script src="js/dashboard.js"></script>
     <script src="js/app.js"></script>
 </body>
-
 </html>

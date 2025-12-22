@@ -3,15 +3,20 @@
  * Initializes the application and sets up event listeners
  */
 
-/**
- * Initialize the application
- */
 function initApp() {
-    // Initialize restore modal
-    initRestoreModal();
+    console.log('🚀 App Initializing...');
+
+    // 初始化還原視窗
+    if (typeof initRestoreModal === 'function') {
+        initRestoreModal();
+    }
     
-    // Any other initialization code can go here
-    console.log('Dropbex application initialized');
+    // 關鍵：網頁載入時，檢查是否有舊的登入 Session
+    if (typeof checkCurrentSession === 'function') {
+        checkCurrentSession();
+    }
+
+    console.log('✅ Dropbex application initialized');
 }
 
 // Initialize app when DOM is ready
@@ -20,4 +25,3 @@ if (document.readyState === 'loading') {
 } else {
     initApp();
 }
-

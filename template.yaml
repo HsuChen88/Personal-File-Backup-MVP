@@ -1,92 +1,134 @@
-﻿Resources:
-  Bucket:
+﻿AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  AppName:
+    Type: String
+    Default: dropbex-app-2025
+  GroqApiKey:
+    Type: String
+    NoEcho: true
+
+Resources:
+  # 1. S3 Bucket (移除內部的 NotificationConfiguration 以打破循環)
+  StorageBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub ${AWS::StackName}-bucket-${AWS::AccountId}
-      BucketEncryption:
-        ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              SSEAlgorithm: aws:kms
-              KMSMasterKeyID: alias/aws/s3
-      PublicAccessBlockConfiguration:
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
-  BucketBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref Bucket
-      PolicyDocument:
-        Id: RequireEncryptionInTransit
-        Version: '2012-10-17'
-        Statement:
-          - Principal: '*'
-            Action: '*'
-            Effect: Deny
-            Resource:
-              - !GetAtt Bucket.Arn
-              - !Sub ${Bucket.Arn}/*
-            Condition:
-              Bool:
-                aws:SecureTransport: 'false'
-  Api:
-    Type: AWS::Serverless::Api
-    Properties:
-      Name: !Sub
-        - ${ResourceName} From Stack ${AWS::StackName}
-        - ResourceName: Api
-      StageName: Prod
-      DefinitionBody:
-        openapi: '3.0'
-        info: {}
-        paths:
-          /request-upload:
-            post:
-              x-amazon-apigateway-integration:
-                httpMethod: POST
-                type: aws_proxy
-                uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RequestUploadHandler.Arn}/invocations
-              responses: {}
-      EndpointConfiguration: REGIONAL
-      TracingEnabled: true
-      Cors:
-        AllowMethods: "'POST,OPTIONS'"
-        AllowHeaders: "'Content-Type'"
-        AllowOrigin: "'*'" 
-  RequestUploadHandler:
+      BucketName: !Ref AppName
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+            AllowedOrigins: ['*']
+            MaxAge: 3000
+
+  # 2. Lambda 函數
+  SummaryFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Description: !Sub
-        - Stack ${AWS::StackName} Function ${ResourceName}
-        - ResourceName: RequestUploadHandler
-      CodeUri: src/RequestUploadHandler
-      Handler: index.handler
-      Runtime: nodejs22.x
-      MemorySize: 256
-      Timeout: 10
-      Tracing: Active
+      CodeUri: backend/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.11
+      Timeout: 45
       Environment:
         Variables:
-          BUCKET_NAME: !Ref Bucket
-          BUCKET_BUCKET_ARN: !GetAtt Bucket.Arn
+          GROQ_API_KEY: !Ref GroqApiKey
       Policies:
-        - Statement:
-            - Effect: Allow
-              Action:
-                - s3:PutObject
-              Resource:
-                - !Sub arn:${AWS::Partition}:s3:::${Bucket}/*
-
+        - S3ReadPolicy:
+            BucketName: !Ref AppName # 使用參數而非直接引用資源物件
+        - S3WritePolicy:
+            BucketName: !Ref AppName
       Events:
-        ApiPOSTrequestupload:
-          Type: Api
+        # 在這裡定義觸發器，SAM 會自動處理權限與順序
+        FileUpload:
+          Type: S3
           Properties:
-            Path: /request-upload
-            Method: POST
-            RestApiId: !Ref Api
-  RequestUploadHandlerLogGroup:
-    Type: AWS::Logs::LogGroup
-    DeletionPolicy: Retain
+            Bucket: !Ref StorageBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: uploads/
+
+  # 3. Cognito 資源 (維持不變)
+  UserPool:
+    Type: AWS::Cognito::UserPool
     Properties:
-      LogGroupName: !Sub /aws/lambda/${RequestUploadHandler}
-      RetentionInDays: 30
-Transform: AWS::Serverless-2016-10-31
+      UserPoolName: !Sub ${AppName}-user-pool
+      AutoVerifiedAttributes: [email]
+      UsernameAttributes: [email]
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub ${AppName}-client
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+
+  IdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+      IdentityPoolName: !Sub ${AppName}_identity_pool
+      AllowUnauthenticatedIdentities: false
+      CognitoIdentityProviders:
+        - ClientId: !Ref UserPoolClient
+          ProviderName: !GetAtt UserPool.ProviderName
+
+  CognitoAuthRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                "cognito-identity.amazonaws.com:aud": !Ref IdentityPool
+
+  IdentityPoolRoleAttachment:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties:
+      IdentityPoolId: !Ref IdentityPool
+      Roles:
+        authenticated: !GetAtt CognitoAuthRole.Arn
+
+  # 4. 網站託管
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${AppName}-web-hosting
+      WebsiteConfiguration:
+        IndexDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub arn:aws:s3:::${WebsiteBucket}/*
+
+Outputs:
+  Region:
+    Value: !Ref AWS::Region
+  UserPoolId:
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
+  IdentityPoolId:
+    Value: !Ref IdentityPool
+  S3BucketName:
+    Value: !Ref StorageBucket
+  WebsiteURL:
+    Value: !GetAtt WebsiteBucket.WebsiteURL

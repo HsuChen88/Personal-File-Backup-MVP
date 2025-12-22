@@ -4,35 +4,33 @@
  */
 
 const AppState = {
-    isLoggedIn: false,
-    currentUser: null,
+    isLoggedIn: false,       // 登入狀態
+    currentUserEmail: null,  // 當前使用者的 Email (用來作為 S3 資料夾名稱)
+    
+    // 模擬檔案列表 (預設可以保留一些範例，或設為空陣列)
     mockFiles: [
-        { id: 1, name: "Project_Proposal_v2.pdf", size: 2500000, date: "2023-12-14", status: "normal" },
-        { id: 2, name: "Financial_Report_Q3.xlsx", size: 120000, date: "2023-12-10", status: "deleted", backupDate: "2023-12-10 14:30" },
-        { id: 3, name: "Meeting_Recording.mp4", size: 45000000, date: "2023-11-20", status: "deleted", backupDate: "2023-11-20 09:15" },
-        { id: 4, name: "Old_Log_Files.zip", size: 5000000, date: "2023-10-01", status: "expired" }
+        { id: 1, name: "Project_Proposal_v2.pdf", size: 2500000, date: "2023-12-14", status: "normal" }
     ],
+    
     currentRestoreFile: null,
 
-    setLoggedIn(value) {
+    // --- 設定狀態的方法 ---
+    setLoggedIn(value, email = null) {
         this.isLoggedIn = value;
+        this.currentUserEmail = email;
+        console.log("🔄 State Updated:", { isLoggedIn: value, email: email });
     },
 
-    setCurrentUser(user) {
-        this.currentUser = user;
-    },
-
+    // --- 檔案操作方法 ---
     addFile(file) {
+        // 新檔案加入到列表最前面
         this.mockFiles.unshift(file);
     },
 
-    updateFileStatus(fileId, status, backupDate = null) {
+    updateFileStatus(fileId, status) {
         const file = this.mockFiles.find(f => f.id === fileId);
         if (file) {
             file.status = status;
-            if (backupDate) {
-                file.backupDate = backupDate;
-            }
         }
     },
 
@@ -48,4 +46,3 @@ const AppState = {
         this.currentRestoreFile = null;
     }
 };
-
