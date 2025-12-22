@@ -122,6 +122,7 @@ copy .env.example .env
 - `COGNITO_APP_CLIENT_ID`
 - `COGNITO_IDENTITY_POOL_ID`
 - `S3_BUCKET_NAME`
+- `SNS_TOPIC_ARN`
 
 ### 其他設定（可選）
 
