@@ -24,6 +24,7 @@ $userPoolId = $config["COGNITO_USER_POOL_ID"]
 $appClientId = $config["COGNITO_APP_CLIENT_ID"]
 $identityPoolId = $config["COGNITO_IDENTITY_POOL_ID"]
 $s3BucketName = $config["S3_BUCKET_NAME"]
+$snsTopicArn = $config["SNS_TOPIC_ARN"]
 
 # Validate required variables
 $missingVars = @()
@@ -33,6 +34,7 @@ if (-not $userPoolId) { $missingVars += "COGNITO_USER_POOL_ID" }
 if (-not $appClientId) { $missingVars += "COGNITO_APP_CLIENT_ID" }
 if (-not $identityPoolId) { $missingVars += "COGNITO_IDENTITY_POOL_ID" }
 if (-not $s3BucketName) { $missingVars += "S3_BUCKET_NAME" }
+if (-not $snsTopicArn) { $missingVars += "SNS_TOPIC_ARN" }
 
 if ($missingVars.Count -gt 0) {
     Write-Host "Error: The following environment variables are not set:" -ForegroundColor Red
@@ -51,7 +53,8 @@ const AWS_CONFIG = {
     userPoolId: '$userPoolId',
     appClientId: '$appClientId',
     identityPoolId: '$identityPoolId',
-    s3BucketName: '$s3BucketName'
+    s3BucketName: '$s3BucketName',
+    snsTopicArn: '$snsTopicArn'
 };
 "@
 

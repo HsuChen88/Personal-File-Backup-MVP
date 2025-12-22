@@ -15,6 +15,7 @@ set "COGNITO_USER_POOL_ID="
 set "COGNITO_APP_CLIENT_ID="
 set "COGNITO_IDENTITY_POOL_ID="
 set "S3_BUCKET_NAME="
+set "SNS_TOPIC_ARN="
 
 REM Read .env file and parse variables
 for /f "usebackq delims=" %%a in (".env") do (
@@ -44,6 +45,7 @@ for /f "usebackq delims=" %%a in (".env") do (
                     if "!var_name!"=="COGNITO_APP_CLIENT_ID" set "COGNITO_APP_CLIENT_ID=!var_value!"
                     if "!var_name!"=="COGNITO_IDENTITY_POOL_ID" set "COGNITO_IDENTITY_POOL_ID=!var_value!"
                     if "!var_name!"=="S3_BUCKET_NAME" set "S3_BUCKET_NAME=!var_value!"
+                    if "!var_name!"=="SNS_TOPIC_ARN" set "SNS_TOPIC_ARN=!var_value!"
                 )
             )
         )
@@ -58,6 +60,7 @@ if "!COGNITO_USER_POOL_ID!"=="" set "missing_vars=!missing_vars! COGNITO_USER_PO
 if "!COGNITO_APP_CLIENT_ID!"=="" set "missing_vars=!missing_vars! COGNITO_APP_CLIENT_ID"
 if "!COGNITO_IDENTITY_POOL_ID!"=="" set "missing_vars=!missing_vars! COGNITO_IDENTITY_POOL_ID"
 if "!S3_BUCKET_NAME!"=="" set "missing_vars=!missing_vars! S3_BUCKET_NAME"
+if "!SNS_TOPIC_ARN!"=="" set "missing_vars=!missing_vars! SNS_TOPIC_ARN"
 
 if not "!missing_vars!"=="" (
     echo Error: The following environment variables are not set:
@@ -74,7 +77,8 @@ echo     apiGatewayUrl: '!API_GATEWAY_URL!',
 echo     userPoolId: '!COGNITO_USER_POOL_ID!',
 echo     appClientId: '!COGNITO_APP_CLIENT_ID!',
 echo     identityPoolId: '!COGNITO_IDENTITY_POOL_ID!',
-echo     s3BucketName: '!S3_BUCKET_NAME!'
+echo     s3BucketName: '!S3_BUCKET_NAME!',
+echo     snsTopicArn: '!SNS_TOPIC_ARN!'
 echo };
 ) > "frontend\js\config.js"
 
