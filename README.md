@@ -66,6 +66,12 @@ copy .env.example .env
 
 如果使用前端功能，部署完成後執行：
 
+**Windows Batch (推薦)**：
+```cmd
+.\build-frontend-config.bat
+```
+
+**PowerShell (備用)**：
 ```powershell
 .\build-frontend-config.ps1
 ```

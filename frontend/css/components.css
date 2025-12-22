@@ -181,7 +181,8 @@
 }
 
 .toast.visible {
-    display: flex;
+    opacity: 1;
+    transform: translateY(0);
 }
 
 @keyframes slideIn {
