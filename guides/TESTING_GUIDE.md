@@ -244,48 +244,248 @@ Write-Host "========================================" -ForegroundColor Cyan
 
 ### 測試 Email 訂閱功能
 
-建立 `test-email-subscribe.ps1`：
+專案中包含以下測試腳本用於測試檔案分享相關功能：
+
+#### 1. test-subscribe.ps1 - 測試 Email 訂閱功能
+
+此腳本測試 `/subscribe-email` API 端點，將 email 訂閱到 SNS Topic。
+
+**使用方式：**
 
 ```powershell
-# test-email-subscribe.ps1
+# 必須提供 Email 參數
+.\test-subscribe.ps1 -Email "user@example.com"
+```
+
+**參數說明：**
+
+| 參數 | 說明 | 是否必填 |
+|------|------|---------|
+| `-Email` | 要訂閱的 email 地址 | ✅ 必填 |
+
+**配置要求：**
+
+以下配置**必須**在 `.env` 檔案中設定：
+
+| 配置項目 | `.env` 變數名稱 | 說明 |
+|---------|---------------|------|
+| API Gateway URL | `API_GATEWAY_URL` 或 `FRONTEND_API_URL` | 必填 |
+| AWS 區域 | `AWS_REGION` | 可選，如果未設定會從 `samconfig.toml` 讀取，最後預設為 `us-east-1` |
+
+**測試流程：**
+
+1. 讀取配置：從 `.env` 檔案讀取 `API_GATEWAY_URL` 和 `AWS_REGION`
+2. 發送訂閱請求：呼叫 `/subscribe-email` API 端點
+3. 顯示結果：顯示訂閱狀態和後續步驟
+
+**輸出範例：**
+
+```
+========================================
+Test Subscribe Email API
+========================================
+
+Loading configuration from .env...
+Using API Gateway URL from .env: https://shruiq2cre.execute-api.us-east-1.amazonaws.com/Prod
+
+Test Configuration:
+  API Endpoint: https://shruiq2cre.execute-api.us-east-1.amazonaws.com/Prod/subscribe-email
+  Email: user@example.com
+
+Request Body:
+{
+    "email":  "user@example.com"
+}
+
+Sending subscription request to API...
+
+Success: API request completed successfully!
+
+Response:
+{
+    "message":  "Subscription request sent successfully",
+    "subscriptionArn":  "arn:aws:sns:us-east-1:123456789012:dropbex-mvp-notifications:abc123...",
+    "email":  "user@example.com"
+}
+
+========================================
+Test Complete: Subscription request sent successfully!
+========================================
+
+Next Steps:
+  1. Check the email inbox: user@example.com
+  2. Look for a subscription confirmation email from AWS SNS
+  3. Click the confirmation link in the email to complete the subscription
+  4. After confirmation, the email will receive notifications from the SNS Topic
+```
+
+**重要提醒：**
+
+- 訂閱後，收件者會收到一封 SNS 確認信
+- 必須點擊確認連結才能完成訂閱
+- 只有確認後的訂閱才能收到通知
+
+#### 2. test-share-only.ps1 - 測試檔案分享功能
+
+此腳本測試 `/share-file` API 端點，發送檔案分享通知。
+
+**使用方式：**
+
+```powershell
+# 必須提供所有參數
+.\test-share-only.ps1 -FileName "test.pdf" -RecipientEmail "user@example.com" -CustomMessage "This is a test message"
+```
+
+**參數說明：**
+
+| 參數 | 說明 | 是否必填 |
+|------|------|---------|
+| `-FileName` | 要分享的檔案名稱 | ✅ 必填 |
+| `-RecipientEmail` | 收件者 email 地址 | ✅ 必填 |
+| `-CustomMessage` | 自訂訊息內容 | ✅ 必填 |
+
+**配置要求：**
+
+以下配置**必須**在 `.env` 檔案中設定：
+
+| 配置項目 | `.env` 變數名稱 | 說明 |
+|---------|---------------|------|
+| API Gateway URL | `API_GATEWAY_URL` 或 `FRONTEND_API_URL` | 必填 |
+| AWS 區域 | `AWS_REGION` | 可選，如果未設定會從 `samconfig.toml` 讀取，最後預設為 `us-east-1` |
+
+**測試流程：**
+
+1. 讀取配置：從 `.env` 檔案讀取 `API_GATEWAY_URL` 和 `AWS_REGION`
+2. 發送分享請求：呼叫 `/share-file` API 端點
+3. ShareFileHandler 會自動嘗試訂閱 email（如果還沒訂閱）
+4. 顯示結果：顯示分享狀態和訂閱狀態
+
+**輸出範例：**
+
+```
+========================================
+Test Share File API (Share Only)
+========================================
+
+Loading configuration from .env...
+Using API Gateway URL from .env: https://shruiq2cre.execute-api.us-east-1.amazonaws.com/Prod
+
+Test Configuration:
+  API Endpoint: https://shruiq2cre.execute-api.us-east-1.amazonaws.com/Prod/share-file
+  File Name: test.pdf
+  Recipient Email: user@example.com
+  Custom Message: This is a test message
+
+Note: This script only sends the share request.
+      The ShareFileHandler will attempt to auto-subscribe the email if not already subscribed.
+
+Request Body:
+{
+    "fileName":  "test.pdf",
+    "recipientEmail":  "user@example.com",
+    "customMessage":  "This is a test message"
+}
+
+Sending share file request to API...
+
+Success: API request completed successfully!
+
+Response:
+{
+    "message":  "File share notification sent successfully",
+    "messageId":  "1be6e8ac-f44e-5031-90a6-896ed0258273",
+    "fileName":  "test.pdf",
+    "recipientEmail":  "user@example.com",
+    "subscriptionStatus":  "subscribed",
+    "note":  "Email has been subscribed to receive notifications. Please check inbox for confirmation email."
+}
+
+========================================
+Test Complete: Share request sent successfully!
+========================================
+
+Next Steps:
+  1. If subscriptionStatus is 'subscribed', check email inbox for confirmation:
+     user@example.com
+     - Click the confirmation link in the subscription email
+  2. After confirming subscription (if needed), check for the share notification email
+  3. Verify the email contains:
+     - File name: test.pdf
+     - Custom message: This is a test message
+```
+
+**重要提醒：**
+
+- 如果 email 還沒訂閱，ShareFileHandler 會自動嘗試訂閱
+- 訂閱狀態會在回應中顯示（`subscriptionStatus`）
+- 如果是新訂閱，收件者需要確認訂閱才能收到通知
+
+#### 3. 測試腳本比較
+
+| 腳本 | 功能 | 參數要求 | 使用場景 |
+|------|------|---------|---------|
+| `test-subscribe.ps1` | 只測試訂閱功能 | 必須提供 `-Email` | 單獨測試 email 訂閱 |
+| `test-share-only.ps1` | 只測試分享功能 | 必須提供 `-FileName`, `-RecipientEmail`, `-CustomMessage` | 單獨測試檔案分享（會自動訂閱） |
+
+---
+
+### 建立自訂測試腳本範本
+
+你可以參考 `test-upload.ps1`、`test-subscribe.ps1` 或 `test-share-only.ps1` 建立新的測試腳本。以下是基本範本：
+
+```powershell
+# test-new-feature.ps1
 param(
-    [string]$ApiUrl = "https://<api-id>.execute-api.us-east-1.amazonaws.com/Prod",
     [Parameter(Mandatory=$true)]
-    [string]$Email
+    [string]$RequiredParam
 )
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "Test Email Subscription" -ForegroundColor Cyan
+Write-Host "Test New Feature" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-Write-Host "Step 1: Subscribing email..." -ForegroundColor Cyan
-try {
-    $requestBody = @{
-        email = $Email
-    } | ConvertTo-Json
+# Load configuration from .env file
+$envFile = ".env"
+$ApiGatewayUrl = ""
+$Region = ""
+
+if (Test-Path $envFile) {
+    Write-Host "Loading configuration from $envFile..." -ForegroundColor Cyan
     
-    $response = Invoke-RestMethod `
-        -Uri "$ApiUrl/subscribe-email" `
-        -Method POST `
-        -ContentType "application/json" `
-        -Body $requestBody
-    
-    Write-Host "Success: Email subscription request sent" -ForegroundColor Green
-    Write-Host "Response: $($response | ConvertTo-Json -Depth 5)" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "Note: Check your email for confirmation message" -ForegroundColor Yellow
-} catch {
-    Write-Host "Failed: Cannot subscribe email" -ForegroundColor Red
-    Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
+    Get-Content $envFile | ForEach-Object {
+        if ($_ -match '^\s*#|^\s*$') { return }
+        if ($_ -match '^\s*([^#][^=]*)\s*=\s*(.*)$') {
+            $name = $matches[1].Trim()
+            $value = $matches[2].Trim()
+            if ($value -match '^["''](.*)["'']$') { $value = $matches[1] }
+            
+            if ($name -eq "API_GATEWAY_URL" -or $name -eq "FRONTEND_API_URL") {
+                if ([string]::IsNullOrEmpty($ApiGatewayUrl)) {
+                    $ApiGatewayUrl = $value
+                }
+            }
+            if ($name -eq "AWS_REGION") {
+                if ([string]::IsNullOrEmpty($Region)) {
+                    $Region = $value
+                }
+            }
+        }
+    }
+} else {
+    Write-Host "Error: $envFile file not found" -ForegroundColor Red
     exit 1
 }
-```
 
-使用方式：
+# Validate required configuration
+if ([string]::IsNullOrEmpty($ApiGatewayUrl)) {
+    Write-Host "Error: API Gateway URL is required" -ForegroundColor Red
+    Write-Host "Please set API_GATEWAY_URL or FRONTEND_API_URL in .env file" -ForegroundColor Yellow
+    exit 1
+}
 
-```powershell
-.\test-email-subscribe.ps1 -Email "your-email@example.com"
+# Your test logic here
+Write-Host "Testing with parameter: $RequiredParam" -ForegroundColor Cyan
 ```
 
 ### 批次測試腳本
