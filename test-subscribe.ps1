@@ -3,13 +3,16 @@
 # This script tests the /subscribe-email API endpoint to subscribe email to SNS Topic
 #
 # Usage:
-#   .\test-subscribe.ps1
 #   .\test-subscribe.ps1 -Email "user@example.com"
+#
+# Required Parameters:
+#   -Email: Email address to subscribe to SNS Topic
 #
 # Note: API Gateway URL can be set in .env file (API_GATEWAY_URL or FRONTEND_API_URL)
 
 param(
-    [string]$Email = "hsuchen@g.ncu.edu.tw"
+    [Parameter(Mandatory=$true)]
+    [string]$Email
 )
 
 Write-Host "========================================" -ForegroundColor Cyan
@@ -17,9 +20,10 @@ Write-Host "Test Subscribe Email API" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Load API Gateway URL from .env file or use default
+# Load API Gateway URL and region from .env file
 $envFile = ".env"
 $ApiGatewayUrl = ""
+$Region = ""
 
 if (Test-Path $envFile) {
     Write-Host "Loading configuration from $envFile..." -ForegroundColor Cyan
@@ -36,17 +40,47 @@ if (Test-Path $envFile) {
                     $ApiGatewayUrl = $value
                 }
             }
+            if ($name -eq "AWS_REGION") {
+                if ([string]::IsNullOrEmpty($Region)) {
+                    $Region = $value
+                }
+            }
         }
+    }
+} else {
+    Write-Host "Error: $envFile file not found" -ForegroundColor Red
+    Write-Host "Please copy .env.example to .env and fill in your configuration" -ForegroundColor Yellow
+    Write-Host "Command: copy .env.example .env" -ForegroundColor Yellow
+    exit 1
+}
+
+# Validate API Gateway URL (must be in .env)
+if ([string]::IsNullOrEmpty($ApiGatewayUrl)) {
+    Write-Host "Error: API Gateway URL is required" -ForegroundColor Red
+    Write-Host "Please set API_GATEWAY_URL or FRONTEND_API_URL in .env file" -ForegroundColor Yellow
+    exit 1
+}
+
+# Validate region (must be in .env, fallback to samconfig.toml)
+if ([string]::IsNullOrEmpty($Region)) {
+    # Try to read from samconfig.toml as fallback
+    $samConfigFile = "samconfig.toml"
+    if (Test-Path $samConfigFile) {
+        $samConfigContent = Get-Content $samConfigFile -Raw
+        if ($samConfigContent -match 'region\s*=\s*"([^"]+)"') {
+            $Region = $matches[1]
+            Write-Host "Warning: AWS_REGION not found in .env, using region from samconfig.toml: $Region" -ForegroundColor Yellow
+        }
+    }
+    
+    # Final fallback
+    if ([string]::IsNullOrEmpty($Region)) {
+        $Region = "us-east-1"
+        Write-Host "Warning: AWS_REGION not found in .env or samconfig.toml, using default: $Region" -ForegroundColor Yellow
     }
 }
 
-# Use default API Gateway URL if not found in .env
-if ([string]::IsNullOrEmpty($ApiGatewayUrl)) {
-    $ApiGatewayUrl = "https://shruiq2cre.execute-api.us-east-1.amazonaws.com/Prod"
-    Write-Host "Warning: API_GATEWAY_URL not found in .env, using default: $ApiGatewayUrl" -ForegroundColor Yellow
-} else {
-    Write-Host "Using API Gateway URL from .env: $ApiGatewayUrl" -ForegroundColor Green
-}
+Write-Host "Using API Gateway URL from .env: $ApiGatewayUrl" -ForegroundColor Green
 
 # Build API endpoint URL
 $ApiEndpoint = "$ApiGatewayUrl/subscribe-email"
