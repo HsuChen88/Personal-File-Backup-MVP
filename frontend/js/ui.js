@@ -1,83 +1,65 @@
 /**
  * UI Helper Functions
- * Functions for managing UI elements like toast notifications and modals
  */
 
-/**
- * Show toast notification
- * @param {string} icon - Emoji or icon to display
- * @param {string} message - Message to show
- */
 function showToast(icon, message) {
     const toast = document.getElementById('toast');
-    document.getElementById('toastIcon').textContent = icon;
-    document.getElementById('toastMessage').textContent = message;
-    toast.classList.add('visible');
-
-    setTimeout(() => {
-        toast.classList.remove('visible');
-    }, 3000);
+    if (toast) {
+        document.getElementById('toastIcon').textContent = icon;
+        document.getElementById('toastMessage').textContent = message;
+        toast.classList.add('visible');
+        setTimeout(() => { toast.classList.remove('visible'); }, 3000);
+    }
 }
 
-/**
- * Open restore modal
- * @param {Object} file - File object to restore
- */
-function openRestoreModal(file) {
-    if (!file) return;
-
-    AppState.setCurrentRestoreFile(file);
-
-    const modalData = document.getElementById('restoreModalText');
-    modalData.innerHTML = `
-        This will restore <strong>${file.name}</strong> from the secure backup vault.
-        <br><br>
-        <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; font-size: 13px; text-align: left; border: 1px solid #e5e7eb;">
-            <div style="margin-bottom: 5px;">📅 Backup Snapshot: <strong>${file.backupDate}</strong></div>
-            <div style="margin-bottom: 5px;">💾 Source: <strong>S3-Backup-Vault-01</strong></div>
-            <div style="color: #059669;">🔒 Integrity Check: <strong>Verified</strong></div>
-        </div>
-    `;
-
-    document.getElementById('restoreModal').classList.add('visible');
-}
-
-/**
- * Close restore modal
- */
-function closeRestoreModal() {
-    document.getElementById('restoreModal').classList.remove('visible');
-    AppState.clearCurrentRestoreFile();
-}
-
-/**
- * Initialize restore modal event listener
- */
+// 修正後的初始化函式
 function initRestoreModal() {
-    document.getElementById('confirmRestoreBtn').addEventListener('click', function () {
-        const file = AppState.currentRestoreFile;
+    const confirmBtn = document.getElementById('confirmRestoreBtn');
+    
+    // 如果 HTML 中沒有這個按鈕（目前 index.html 確實沒有），則安靜地結束
+    if (!confirmBtn) return; 
+
+    confirmBtn.addEventListener('click', function () {
+        const file = (typeof AppState !== 'undefined') ? AppState.currentRestoreFile : null;
         if (!file) return;
 
         const btn = this;
-        const originalText = btn.textContent;
         btn.textContent = 'Processing...';
         btn.disabled = true;
-        btn.style.opacity = '0.7';
 
-        // Simulate API Call
         setTimeout(() => {
-            // Success
             closeRestoreModal();
             showToast('✅', `Success! ${file.name} has been restored.`);
-
-            // Update local state
-            AppState.updateFileStatus(file.id, 'normal');
-            renderFileDashboard();
-
-            // Reset button
-            btn.textContent = originalText;
+            btn.textContent = 'Confirm Restore';
             btn.disabled = false;
-            btn.style.opacity = '1';
         }, 1500);
     });
+}
+
+function showDashboard() {
+    const mainGrid = document.getElementById('mainGrid');
+    if (mainGrid) mainGrid.style.display = 'none';
+
+    const loggedInGrid = document.getElementById('loggedInGrid');
+    if (loggedInGrid) {
+        loggedInGrid.style.display = 'grid';
+        loggedInGrid.classList.add('visible');
+    }
+
+    const headerUser = document.getElementById('headerUserSection');
+    if (headerUser) headerUser.style.display = 'flex';
+}
+
+function showAuth() {
+    const mainGrid = document.getElementById('mainGrid');
+    if (mainGrid) mainGrid.style.display = 'flex';
+
+    const loggedInGrid = document.getElementById('loggedInGrid');
+    if (loggedInGrid) {
+        loggedInGrid.style.display = 'none';
+        loggedInGrid.classList.remove('visible');
+    }
+
+    const headerUser = document.getElementById('headerUserSection');
+    if (headerUser) headerUser.style.display = 'none';
 }
