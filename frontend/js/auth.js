@@ -34,11 +34,6 @@ function checkCurrentSession() {
 
             // 更新 UI 並觸發資料同步
             switchToLoggedInLayout(email);
-            
-            // 檢查訂閱狀態（用於 F5 重新整理）
-            if (typeof checkAndPromptSubscription === 'function') {
-                checkAndPromptSubscription(email);
-            }
         } catch (e) {
             console.error("Session restore failed (Token invalid):", e);
             handleLogout(); // Token 有問題，強制登出
@@ -118,6 +113,10 @@ function handleLoginSubmit(event) {
 /**
  * 處理註冊表單送出
  */
+/**
+ * 處理註冊表單送出
+ * 同時觸發 Cognito 註冊與 SNS 訂閱通知
+ */
 function handleRegisterSubmit(e) {
     e.preventDefault();
     
@@ -141,6 +140,8 @@ function handleRegisterSubmit(e) {
     const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
     const attributeList = [new AmazonCognitoIdentity.CognitoUserAttribute({ Name: 'email', Value: email })];
 
+    
+
     userPool.signUp(email, password, attributeList, null, function(err, result) {
         if (err) {
             if (err.code === 'UsernameExistsException') {
@@ -154,7 +155,37 @@ function handleRegisterSubmit(e) {
             return;
         }
         
-        showToast('📧', 'Code sent to your email!');
+        // --- SNS 自動訂閱邏輯 ---
+        // 強制在 Console 打印訊息，用於確認邏輯是否有被執行
+        console.log("=== 觸發 SNS 訂閱請求 ===");
+        console.log("目標端點:", AWS_CONFIG.subscribeTopicUrl);
+
+        // 呼叫訂閱 API (SubscribeEmailHandler)
+        fetch(AWS_CONFIG.subscribeTopicUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email: email })
+        })
+        .then(response => {
+            console.log("SNS API 回應狀態:", response.status);
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            console.log("SNS 訂閱結果:", data);
+            // 若成功，提示語會包含訂閱信件資訊
+            showToast('📧', '驗證碼與訂閱確認信已發送至您的信箱！');
+        })
+        .catch(error => {
+            console.error("SNS 訂閱發生錯誤:", error);
+            // 即使 SNS 失敗，我們仍讓使用者繼續完成 Cognito 註冊
+            showToast('📧', 'Code sent to your email!');
+        });
+        // --- SNS 邏輯結束 ---
+
+        // 顯示驗證碼輸入區塊
         showConfirmSection(email);
 
         btn.disabled = false;
@@ -379,11 +410,6 @@ function switchToLoggedInLayout(email) {
         window.refreshAllDashboards();
     } else if (typeof renderFileDashboard === 'function') {
         renderFileDashboard(); 
-    }
-    
-    // 5. 檢查訂閱狀態（用於帳號密碼登入）
-    if (typeof checkAndPromptSubscription === 'function') {
-        checkAndPromptSubscription(email);
     }
 }
 

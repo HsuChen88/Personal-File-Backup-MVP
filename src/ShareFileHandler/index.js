@@ -1,182 +1,103 @@
 const { SNSClient, PublishCommand } = require('@aws-sdk/client-sns');
+const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 const snsClient = new SNSClient({ region: process.env.AWS_REGION || 'us-east-1' });
+const s3Client = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
 
 exports.handler = async (event) => {
     console.log('Share file event:', JSON.stringify(event, null, 2));
     
     const topicArn = process.env.SNS_TOPIC_ARN;
+    const bucketName = process.env.BUCKET_NAME; // 需在 template.yaml 設定此環境變數
     
-    if (!topicArn) {
-        console.error('SNS_TOPIC_ARN environment variable is not set');
+    // 1. 環境變數檢查
+    if (!topicArn || !bucketName) {
         return {
             statusCode: 500,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            body: JSON.stringify({
-                error: 'Server configuration error'
-            })
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            body: JSON.stringify({ error: 'Server configuration error: TopicArn or BucketName missing' })
         };
     }
     
     try {
-        // 解析請求 body
+        // 2. 解析請求 Body
         let body;
         try {
             body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body || {};
-        } catch (parseError) {
-            console.error('Failed to parse request body:', parseError);
+        } catch (e) {
             return {
                 statusCode: 400,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                body: JSON.stringify({
-                    error: 'Invalid request body format'
-                })
+                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                body: JSON.stringify({ error: 'Invalid JSON format' })
             };
         }
         
-        // 驗證必要參數
-        const fileName = body.fileName;
-        const recipientEmail = body.recipientEmail;
-        const customMessage = body.customMessage;
-        const downloadUrl = body.downloadUrl; // 選填參數
+        const { fileName, recipientEmail, customMessage, s3Key } = body;
         
-        if (!fileName) {
+        // 3. 參數驗證
+        if (!recipientEmail || !s3Key) {
             return {
                 statusCode: 400,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                body: JSON.stringify({
-                    error: 'fileName is required'
-                })
+                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                body: JSON.stringify({ error: 'recipientEmail and s3Key are required' })
             };
         }
-        
-        if (!recipientEmail) {
-            return {
-                statusCode: 400,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                body: JSON.stringify({
-                    error: 'recipientEmail is required'
-                })
-            };
-        }
-        
-        if (!customMessage) {
-            return {
-                statusCode: 400,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                body: JSON.stringify({
-                    error: 'customMessage is required'
-                })
-            };
-        }
-        
-        // 驗證 email 格式
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(recipientEmail)) {
-            return {
-                statusCode: 400,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                body: JSON.stringify({
-                    error: 'Invalid recipientEmail format'
-                })
-            };
-        }
-        
-        // 準備 SNS 訊息內容（用於 JSON 格式）
-        const notificationMessage = {
-            event: 'file_shared',
-            fileName: fileName,
-            recipientEmail: recipientEmail,
-            customMessage: customMessage,
-            downloadUrl: downloadUrl || '',
-            timestamp: new Date().toISOString()
+
+        // 4. 產生 S3 預簽名下載連結 (有效期 24 小時)
+        const getObjectParams = {
+            Bucket: bucketName,
+            Key: s3Key
         };
-        
-        // 準備人類可讀的郵件內容
-        let emailContent = `檔案名稱: ${fileName}\n\n`;
-        emailContent += `分享者的話:\n${customMessage}\n\n`;
-        
-        if (downloadUrl) {
-            emailContent += `下載連結:\n${downloadUrl}\n\n`;
-        }
-        
-        emailContent += `---\n此訊息由 Dropbex 系統自動發送`;
-        
-        // 發送 SNS 訊息
-        const params = {
+        const command = new GetObjectCommand(getObjectParams);
+        const signedDownloadUrl = await getSignedUrl(s3Client, command, { expiresIn: 86400 });
+
+        // 5. 組合 SNS 訊息內容
+        const displayFileName = fileName || s3Key.split('/').pop();
+        const messageContent = `
+[Dropbex] 有人分享了檔案給您！
+
+檔案名稱: ${displayFileName}
+分享者的話: ${customMessage || '無額外訊息'}
+
+直接下載連結 (有效期 24 小時):
+${signedDownloadUrl}
+
+---
+此訊息由 Dropbex 系統自動發送，請勿直接回覆。
+`;
+
+        // 6. 發布訊息至 SNS
+        const publishParams = {
             TopicArn: topicArn,
-            Message: emailContent, // 使用人類可讀的格式
-            Subject: `[Dropbex] 有人分享了檔案給您`,
+            Subject: `[Dropbex] 檔案分享：${displayFileName}`,
+            Message: messageContent,
             MessageAttributes: {
-                eventType: {
-                    DataType: 'String',
-                    StringValue: 'file_shared'
-                },
-                fileName: {
-                    DataType: 'String',
-                    StringValue: fileName
-                },
                 recipientEmail: {
                     DataType: 'String',
                     StringValue: recipientEmail
                 }
             }
         };
-        
-        const snsResponse = await snsClient.send(new PublishCommand(params));
-        
-        // 記錄通知
-        console.log('File share notification sent:', {
-            fileName: fileName,
-            recipientEmail: recipientEmail,
-            messageId: snsResponse.MessageId,
-            timestamp: new Date().toISOString()
-        });
-        
+
+        const result = await snsClient.send(new PublishCommand(publishParams));
+        console.log('Message published successfully:', result.MessageId);
+
         return {
             statusCode: 200,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            body: JSON.stringify({
-                message: 'File share notification sent successfully',
-                messageId: snsResponse.MessageId,
-                fileName: fileName,
-                recipientEmail: recipientEmail
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            body: JSON.stringify({ 
+                message: 'Share notification sent successfully', 
+                messageId: result.MessageId 
             })
         };
+
     } catch (error) {
-        console.error('Error processing file share notification:', error);
-        
+        console.error('Error sharing file:', error);
         return {
             statusCode: 500,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            body: JSON.stringify({
-                error: error.message || 'Internal server error'
-            })
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            body: JSON.stringify({ error: error.message || 'Internal server error' })
         };
     }
 };
-

@@ -1,1 +1,27 @@
 test
+
+
+const AWS_CONFIG = {
+    // 基礎區域設定
+    region: "us-east-1",
+
+    // Cognito 使用者池設定 (身分驗證)
+    userPoolId: "us-east-1_lgasjZrvQ",
+    appClientId: "3bogos9pdo8oe22sakkgq9j1ec",
+
+    // Cognito 身份池設定 (讓前端具備存取 S3 的權限)
+    identityPoolId: "us-east-1:1a7e0fa0-54a1-492e-8568-0cedd5bea2db",
+
+    // S3 儲存桶名稱 (檔案存放處)
+    s3BucketName: "dropbex-app-2025122301-storage-934297345929",
+
+    // API Gateway 端點 (後端所有功能入口)
+    apiBaseUrl: "https://cdq0fsybte.execute-api.us-east-1.amazonaws.com/Prod",
+
+    // 特定功能快捷連結 (由 dashboard.js 與 upload.js 使用)
+    downloadApiUrl: "https://cdq0fsybte.execute-api.us-east-1.amazonaws.com/Prod/download",
+    requestUploadUrl: "https://cdq0fsybte.execute-api.us-east-1.amazonaws.com/Prod/request-upload",
+    filesApiUrl: "https://cdq0fsybte.execute-api.us-east-1.amazonaws.com/Prod/files",
+    deleteApiUrl: "https://cdq0fsybte.execute-api.us-east-1.amazonaws.com/Prod/delete",
+    restoreApiUrl: "https://cdq0fsybte.execute-api.us-east-1.amazonaws.com/Prod/restore"
+};

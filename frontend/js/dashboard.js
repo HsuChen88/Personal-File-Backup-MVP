@@ -288,70 +288,68 @@ function renderUserFileList(files, userEmail) {
     if(!container) return;
     container.innerHTML = ''; 
 
-    // ★ 修改排序邏輯：先讓「未刪除」排在前面，接著才是依照日期新舊排序
+    // 取得「已還原檔案」的清單
+    const recoveredFiles = JSON.parse(localStorage.getItem('recovered_files') || '[]');
+
     files.sort((a, b) => {
-        // 1. 第一層比較：刪除狀態 (Deleted)
-        // 如果 a 是刪除(true) 而 b 是未刪除(false)，a 應該排在後面 (return 1)
-        // 如果 a 是未刪除(false) 而 b 是刪除(true)，a 應該排在前面 (return -1)
         if (a.isDeleted !== b.isDeleted) {
             return a.isDeleted ? 1 : -1;
         }
-        
-        // 2. 第二層比較：如果狀態一樣，則比較時間 (越新的越前面)
         return new Date(b.LastModified) - new Date(a.LastModified);
     });
 
     files.forEach(file => {
-        // ★ 修改重點 2：檔名處理 (移除 uploads/<email>/ 前綴)
         let displayFileName = file.Key;
-        // 為了安全，這裡做多種可能的路徑檢查
         if (userEmail && displayFileName.includes(`uploads/${userEmail}/`)) {
             displayFileName = displayFileName.split(`uploads/${userEmail}/`)[1];
         } else if (displayFileName.startsWith('uploads/')) {
             displayFileName = displayFileName.replace('uploads/', '');
         }
 
-        // 略過系統檔案或空檔名
         if (!displayFileName || displayFileName.endsWith('_summary.txt')) return;
 
         const fileSize = file.Size ? formatFileSize(file.Size) : '-';
         const safeKey = file.Key.replace(/'/g, "\\'");
         const icon = getFileIcon(displayFileName);
         
-        // ★ 修改重點 3：解析時間與狀態
         const dateStr = file.LastModified 
             ? new Date(file.LastModified).toLocaleString() 
             : 'Unknown Date';
 
         const isDeleted = file.isDeleted === true;
-        const versionId = file.VersionId || 'null'; // 還原時需要用到
+        const versionId = file.VersionId || 'null';
 
-        // ★ 修改重點 4：根據 isDeleted 決定樣式與按鈕
-        // 狀態標籤
-        const statusTag = isDeleted 
-            ? `<span class="status-tag status-deleted">Deleted</span>` 
-            : `<span class="status-tag status-stored">Stored</span>`;
+        // ★★★ 修改重點：判斷標籤顯示邏輯 ★★★
+        let statusTag = '';
+        
+        if (isDeleted) {
+            // 1. 如果是刪除狀態，優先顯示紅色 Deleted
+            statusTag = `<span class="status-tag status-deleted">Deleted</span>`;
+        } else if (recoveredFiles.includes(file.Key)) {
+            // 2. 如果不在刪除狀態，且在還原清單中，顯示淺藍色 Recover
+            statusTag = `<span class="status-tag status-recovered">Recovered</span>`;
+        } else {
+            // 3. 其他情況顯示綠色 Stored
+            statusTag = `<span class="status-tag status-stored">Stored</span>`;
+        }
 
-        // CSS Class (讓整行變淡/刪除線)
         const rowClass = isDeleted ? 'file-row deleted-row' : 'file-row';
 
-        // 按鈕邏輯 (Deleted 顯示 Restore; 一般顯示原本的操作按鈕)
         let buttonsHtml = '';
         if (isDeleted) {
-            // 只有還原按鈕
             buttonsHtml = `
                 <button class="action-btn restore" title="Restore File" onclick="handleRestore('${safeKey}', '${versionId}')">
                     ↩ 
                 </button>
             `;
         } else {
-            // 一般操作按鈕 (保留原本功能)
-            buttonsHtml = `
-                <button class="action-btn ai-summary" title="AI Summary" style="color: #f59e0b;" onclick="handleViewSummary('${safeKey}')">✨</button>
-                <button class="action-btn publish" title="Publish to Public" style="color: #3b82f6;" onclick="handlePublishToPublic('${safeKey}')">🌍</button>
-                <button class="action-btn download" title="Download" style="color: #10b981;" onclick="handleDownloadFile('${safeKey}')">⬇</button>
-                <button class="action-btn delete" title="Recycle Bin" onclick="handleDeleteFile('${safeKey}')">🗑️</button>
-            `;
+            // ★ 注意：這裡使用單引號拼接法，確保不會報錯
+            buttonsHtml = 
+                '<button class="action-btn ai-summary" title="AI Summary" style="color: #f59e0b;" onclick="handleViewSummary(\'' + safeKey + '\')">✨</button>' +
+                '<button class="action-btn publish" title="Publish to Public" style="color: #3b82f6;" onclick="handlePublishToPublic(\'' + safeKey + '\')">🌍</button>' +
+                '<button class="action-btn download" title="Download" style="color: #10b981;" onclick="handleDownloadFile(\'' + safeKey + '\')">⬇</button>' +
+                '<button class="action-btn share" title="Share via Email" style="color: #8b5cf6;" onclick="handleFileShare(\'' + safeKey + '\')">✉️</button>' +
+                '<button class="action-btn delete" title="Recycle Bin" onclick="handleDeleteFile(\'' + safeKey + '\')">🗑️</button>';
         }
 
         const html = `
@@ -382,16 +380,17 @@ function renderPublicFileList(files) {
     if(!container) return;
     container.innerHTML = ''; 
     
-    // 注意：搜尋時若需要維持 S3 在上的順序，則不應在此依日期全局重新排序
-    // 除非檔案類型相同時才比對日期。
-
     files.forEach((file, index) => {
+        // 處理檔名中的單引號，避免 JS 報錯
         const safeKey = file.key.replace(/'/g, "\\'"); 
         
         let icon, tagHtml, actionHtml;
         let displayName = file.name;
         let contributorHtml = '';
 
+        // ===============================================
+        // 情境 A: S3 內部的公共檔案 (升級成 Email 分享)
+        // ===============================================
         if (file.type === 's3') {
             if (displayName.includes('/')) {
                 const parts = displayName.split('/');
@@ -408,15 +407,23 @@ function renderPublicFileList(files) {
 
             icon = getFileIcon(displayName);
             tagHtml = `<span class="status-tag status-stored" style="background: #e0f2fe; color: #0369a1; border-color: #bae6fd;">Public</span>`;
+            
+            // ★★★ 修改重點：將原本的 Copy Link 改為 Email Share (handleFileShare) ★★★
             actionHtml = `
                 <button class="action-btn ai-summary" title="AI Summary" style="color: #f59e0b;" onclick="handleViewSummary('${safeKey}')">✨</button>
-                <button class="action-btn share" title="Copy Link" onclick="handlePublicShare('${safeKey}')">➦</button>
+                <button class="action-btn share" title="Share via Email" style="color: #8b5cf6;" onclick="handleFileShare('${safeKey}')">✉️</button>
                 <button class="action-btn download" title="Download" onclick="handleDownloadFile('${safeKey}')">⬇</button>
             `;
-        } else {
+        } 
+        // ===============================================
+        // 情境 B: 外部 arXiv 論文 (維持複製連結)
+        // ===============================================
+        else {
             icon = '🌐';
             tagHtml = `<span class="status-tag status-stored" style="background: #fef3c7; color: #d97706; border-color: #fcd34d;">arXiv</span>`;
             contributorHtml = `<div style="font-size: 11px; color: #6b7280; margin-top: 2px;">🏫 Source: Cornell University</div>`;
+            
+            // arXiv 是外部連結，後端無法簽名，所以維持 handlePublicShare (複製連結)
             actionHtml = `
                 <button class="action-btn ai-summary" title="Preview Abstract" style="color: #f59e0b;" onclick="handleExternalSummary(${index})">✨</button>
                 <button class="action-btn download" title="Save to My Collection" style="color: #10b981;" onclick="handleSaveToCollection(${index})">📥</button>
@@ -459,12 +466,24 @@ function getFileIcon(fileName) {
 // 5. 抓取外部論文 (arXiv)
 // ==========================================
 
+// ==========================================
+// 5. 抓取外部論文 (arXiv) - 已修正 Proxy
+// ==========================================
+
 async function fetchArxivPapers(query) {
+    // arXiv API 原始網址
     const targetUrl = `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&start=0&max_results=5`;
-    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+    
+    // ❌ 舊的 (corsproxy.io 目前似乎掛了)
+    // const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+
+    // ✅ 新的建議 (使用 AllOrigins，通常較穩定)
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
 
     try {
+        console.log(`正在透過 Proxy 抓取 arXiv: ${proxyUrl}`);
         const response = await fetch(proxyUrl);
+        
         if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
         
         const str = await response.text();
@@ -475,10 +494,19 @@ async function fetchArxivPapers(query) {
         const papers = [];
         for (let i = 0; i < entries.length; i++) {
             const entry = entries[i];
-            const title = entry.getElementsByTagName("title")[0].textContent.replace(/\n/g, "").trim();
-            const id = entry.getElementsByTagName("id")[0].textContent;
-            const summary = entry.getElementsByTagName("summary")[0].textContent.trim();
             
+            // 安全性檢查：確保欄位存在
+            const titleElem = entry.getElementsByTagName("title")[0];
+            const idElem = entry.getElementsByTagName("id")[0];
+            const summaryElem = entry.getElementsByTagName("summary")[0];
+
+            if (!titleElem || !idElem) continue;
+
+            const title = titleElem.textContent.replace(/\n/g, "").trim();
+            const id = idElem.textContent;
+            const summary = summaryElem ? summaryElem.textContent.trim() : "No abstract available.";
+            
+            // 轉換 PDF連結
             let pdfLink = id.replace("abs", "pdf");
             if (pdfLink.startsWith("http://")) {
                 pdfLink = pdfLink.replace("http://", "https://");
@@ -497,6 +525,7 @@ async function fetchArxivPapers(query) {
         return papers;
     } catch (error) {
         console.error("arXiv fetch error:", error);
+        // 若發生錯誤，回傳空陣列以免卡住 UI
         return [];
     }
 }
@@ -605,7 +634,6 @@ async function handleRestore(s3Key, versionId) {
     if (!idToken) return;
 
     try {
-        // ★ 新增重點：呼叫 /restore API
         const response = await fetch(AWS_CONFIG.restoreApiUrl, {
             method: 'POST',
             headers: {
@@ -621,6 +649,13 @@ async function handleRestore(s3Key, versionId) {
         const resData = await response.json();
 
         if (response.ok) {
+            // ★★★ 新增重點：還原成功後，將此檔案記錄到 localStorage ★★★
+            let recoveredFiles = JSON.parse(localStorage.getItem('recovered_files') || '[]');
+            if (!recoveredFiles.includes(s3Key)) {
+                recoveredFiles.push(s3Key);
+                localStorage.setItem('recovered_files', JSON.stringify(recoveredFiles));
+            }
+
             showToast('✅', 'File restored successfully!');
             setTimeout(refreshFileDashboard, 500);
         } else {
@@ -736,321 +771,69 @@ async function handlePublicShare(key) {
     showToast('🔗', '連結已複製');
 }
 
-function handleTeamShare(s3Key) {
-    console.log('[Share] Opening share modal for file:', s3Key);
-    showShareModal(s3Key);
-}
-
-// ==========================================
-// 6.5. Share 功能實作
-// ==========================================
-
 /**
- * 顯示 Share 模態框
- * @param {string} s3Key - S3 檔案路徑
+ * 處理檔案分享 (發送通知)
+ * @param {string} s3Key 檔案的 S3 Key
  */
-function showShareModal(s3Key) {
-    console.log('[Share] Creating share modal for:', s3Key);
-    
-    // 檢查是否已經有模態框存在
-    const existingModal = document.getElementById('shareModal');
-    if (existingModal) {
-        console.log('[Share] Modal already exists, removing old one');
-        existingModal.remove();
-    }
-    
-    const existingOverlay = document.getElementById('shareModalOverlay');
-    if (existingOverlay) {
-        existingOverlay.remove();
-    }
-
-    // 創建模態框遮罩
-    const modalOverlay = document.createElement('div');
-    modalOverlay.id = 'shareModalOverlay';
-    modalOverlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.6);
-        backdrop-filter: blur(4px);
-        z-index: 10000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
-        box-sizing: border-box;
-    `;
-
-    // 創建模態框內容
-    const modal = document.createElement('div');
-    modal.id = 'shareModal';
-    modal.style.cssText = `
-        background: white;
-        border-radius: 16px;
-        padding: 40px;
-        max-width: 500px;
-        width: 100%;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        border: 1px solid #e5e7eb;
-        position: relative;
-        max-height: 90vh;
-        overflow-y: auto;
-    `;
-
-    // 關閉按鈕
-    const closeBtn = document.createElement('button');
-    closeBtn.innerHTML = '✕';
-    closeBtn.style.cssText = `
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        background: transparent;
-        border: none;
-        font-size: 24px;
-        color: #9ca3af;
-        cursor: pointer;
-        width: 36px;
-        height: 36px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 8px;
-        transition: all 0.2s;
-        line-height: 1;
-    `;
-    closeBtn.onmouseover = function() {
-        this.style.background = '#f3f4f6';
-        this.style.color = '#374151';
-    };
-    closeBtn.onmouseout = function() {
-        this.style.background = 'transparent';
-        this.style.color = '#9ca3af';
-    };
-    closeBtn.onclick = closeShareModal;
-
-    modal.innerHTML = `
-        <div style="margin-bottom: 32px;">
-            <h2 style="font-size: 22px; font-weight: 600; color: #1f2937; margin: 0 0 8px 0;">分享檔案</h2>
-            <p style="color: #6b7280; font-size: 14px; margin: 0;">將檔案分享給其他使用者</p>
-        </div>
-        
-        <form id="shareForm" onsubmit="event.preventDefault(); handleShareSubmit('${s3Key.replace(/'/g, "\\'")}');">
-            <div style="margin-bottom: 24px;">
-                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500; font-size: 14px;">
-                    傳送到電子郵件
-                </label>
-                <input 
-                    type="email" 
-                    id="shareRecipientEmail" 
-                    placeholder="recipient@example.com" 
-                    required
-                    style="
-                        width: 100%;
-                        padding: 12px 16px;
-                        border: 2px solid #e5e7eb;
-                        border-radius: 8px;
-                        font-size: 15px;
-                        transition: all 0.2s;
-                        font-family: inherit;
-                        box-sizing: border-box;
-                        background: #f9fafb;
-                    "
-                    onfocus="this.style.borderColor='#667eea'; this.style.background='#fff'; this.style.boxShadow='0 0 0 3px rgba(102, 126, 234, 0.1)';"
-                    onblur="this.style.borderColor='#e5e7eb'; this.style.background='#f9fafb'; this.style.boxShadow='none';"
-                >
-            </div>
-            
-            <div style="margin-bottom: 32px;">
-                <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500; font-size: 14px;">
-                    想對他說的話
-                </label>
-                <textarea 
-                    id="shareCustomMessage" 
-                    rows="5" 
-                    placeholder="輸入您的訊息..."
-                    required
-                    style="
-                        width: 100%;
-                        padding: 12px 16px;
-                        border: 2px solid #e5e7eb;
-                        border-radius: 8px;
-                        font-size: 15px;
-                        transition: all 0.2s;
-                        font-family: inherit;
-                        box-sizing: border-box;
-                        resize: vertical;
-                        line-height: 1.5;
-                        min-height: 120px;
-                        background: #f9fafb;
-                    "
-                    onfocus="this.style.borderColor='#667eea'; this.style.background='#fff'; this.style.boxShadow='0 0 0 3px rgba(102, 126, 234, 0.1)';"
-                    onblur="this.style.borderColor='#e5e7eb'; this.style.background='#f9fafb'; this.style.boxShadow='none';"
-                ></textarea>
-            </div>
-            
-            <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                <button 
-                    type="button" 
-                    onclick="closeShareModal()"
-                    style="
-                        background: white;
-                        color: #6b7280;
-                        border: 1px solid #d1d5db;
-                        padding: 12px 24px;
-                        border-radius: 8px;
-                        font-size: 14px;
-                        font-weight: 600;
-                        cursor: pointer;
-                        transition: all 0.2s;
-                    "
-                    onmouseover="this.style.background='#f9fafb'; this.style.borderColor='#9ca3af';"
-                    onmouseout="this.style.background='white'; this.style.borderColor='#d1d5db';"
-                >
-                    取消
-                </button>
-                <button 
-                    type="submit" 
-                    id="shareSubmitBtn"
-                    style="
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
-                        border: none;
-                        padding: 12px 24px;
-                        border-radius: 8px;
-                        font-size: 14px;
-                        font-weight: 600;
-                        cursor: pointer;
-                        transition: all 0.3s;
-                        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-                    "
-                    onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(102, 126, 234, 0.4)';"
-                    onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.3)';"
-                >
-                    發送
-                </button>
-            </div>
-        </form>
-    `;
-
-    modal.insertBefore(closeBtn, modal.firstChild);
-    modalOverlay.appendChild(modal);
-    document.body.appendChild(modalOverlay);
-    
-    console.log('[Share] Share modal displayed');
-}
-
-/**
- * 處理 Share 表單提交
- * @param {string} s3Key - S3 檔案路徑
- */
-async function handleShareSubmit(s3Key) {
-    const recipientEmail = document.getElementById('shareRecipientEmail').value.trim();
-    const customMessage = document.getElementById('shareCustomMessage').value.trim();
-    const submitBtn = document.getElementById('shareSubmitBtn');
-    
-    console.log('[Share] User submitted form, recipient:', recipientEmail);
-    
-    // 驗證欄位
-    if (!recipientEmail || !customMessage) {
-        showToast('⚠️', '請填寫所有欄位');
+async function handleFileShare(s3Key) {
+    // 檢查 s3Key 是否存在
+    if (!s3Key) {
+        console.error("Missing s3Key!");
         return;
     }
+
+    const recipientEmail = prompt("請輸入收件者的 Email：");
+    if (!recipientEmail) return;
+
+    const customMessage = prompt("輸入分享訊息：", "這是透過 Dropbex 分享給您的檔案。");
     
-    // 驗證 email 格式
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(recipientEmail)) {
-        showToast('⚠️', '請輸入有效的電子郵件地址');
-        return;
-    }
-    
-    submitBtn.disabled = true;
-    submitBtn.textContent = '發送中...';
-    
+    // 提取純檔名供顯示
+    const fileName = s3Key.split('/').pop();
+
+    showToast('⏳', '正在發送分享通知...');
+
     try {
-        // 1. 檢查收件人是否已訂閱
-        console.log('[Share] Checking recipient subscription status');
-        const checkResult = await checkUserSubscription(recipientEmail);
-        const isRecipientSubscribed = checkResult.isSubscribed === true;
-        
-        console.log('[Share] Recipient subscription check result:', isRecipientSubscribed);
-        
-        if (!isRecipientSubscribed) {
-            showToast('❌', '對方尚未到信箱點選確認接收，因此無法接收訊息');
-            submitBtn.disabled = false;
-            submitBtn.textContent = '發送';
-            return;
-        }
-        
-        // 2. 生成預簽名下載連結
-        console.log('[Share] Generating presigned download URL');
-        const s3 = new AWS.S3();
-        const fileName = s3Key.split('/').pop();
-        
-        const downloadUrl = await s3.getSignedUrlPromise('getObject', {
-            Bucket: AWS_CONFIG.s3BucketName,
-            Key: s3Key,
-            Expires: 604800 // 7 天
-        });
-        
-        console.log('[Share] Presigned URL generated');
-        
-        // 3. 呼叫 Share API
-        console.log('[Share] Calling share API with params:', {
-            fileName: fileName,
-            recipientEmail: recipientEmail,
-            customMessage: customMessage
-        });
-        
-        const response = await fetch(AWS_CONFIG.apiGatewayUrl + '/share', {
+        const response = await fetch(AWS_CONFIG.shareFileUrl, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': localStorage.getItem('idToken') || ''
             },
             body: JSON.stringify({
-                fileName: fileName,
+                fileName: fileName,      // 檔名
+                s3Key: s3Key,           // ✨ 關鍵：必須傳送完整的 S3 路徑
                 recipientEmail: recipientEmail,
-                customMessage: customMessage,
-                downloadUrl: downloadUrl
+                customMessage: customMessage
             })
         });
-        
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            console.error('[Share] Share API failed:', response.status, errorData);
-            showToast('❌', errorData.error || '分享失敗，請稍後再試');
-            submitBtn.disabled = false;
-            submitBtn.textContent = '發送';
-            return;
-        }
-        
+
         const data = await response.json();
-        console.log('[Share] Share notification sent successfully:', data);
-        
-        showToast('✅', '分享通知已發送');
-        closeShareModal();
-        
-    } catch (error) {
-        console.error('[Share] Error in handleShareSubmit:', error);
-        showToast('❌', '分享失敗，請稍後再試');
-        submitBtn.disabled = false;
-        submitBtn.textContent = '發送';
+
+        if (response.ok) {
+            showToast('✅', `分享信件已發送至 ${recipientEmail}`);
+        } else {
+            throw new Error(data.error || '發送失敗');
+        }
+    } catch (err) {
+        console.error("Share Error:", err);
+        showToast('❌', `分享失敗: ${err.message}`);
     }
 }
 
-/**
- * 關閉 Share 模態框
- */
-function closeShareModal() {
-    const modal = document.getElementById('shareModal');
-    const overlay = document.getElementById('shareModalOverlay');
-    
-    if (modal) modal.remove();
-    if (overlay) overlay.remove();
-    
-    console.log('[Share] Share modal closed');
+// dashboard.js 中的實作
+async function silentSubscribe(email) {
+    try {
+        await fetch(AWS_CONFIG.subscribeTopicUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email })
+        });
+        console.log("SNS 訂閱請求已發送至:", email);
+    } catch (err) {
+        console.error("SNS 自動訂閱失敗:", err);
+    }
 }
+window.silentSubscribe = silentSubscribe; // 綁定到全域
 
 // ==========================================
 // 7. 閱讀器功能
@@ -1134,10 +917,7 @@ window.handleDeleteFile = handleDeleteFile;
 window.handleDownloadFile = handleDownloadFile;
 window.handleSaveToCollection = handleSaveToCollection;
 window.handlePublicShare = handlePublicShare;
-window.handleTeamShare = handleTeamShare;
-window.showShareModal = showShareModal;
-window.handleShareSubmit = handleShareSubmit;
-window.closeShareModal = closeShareModal;
+window.handleFileShare = handleFileShare;
 window.switchListTab = switchListTab;
 window.handleViewFile = handleViewFile;
 window.handleRestore = handleRestore;
