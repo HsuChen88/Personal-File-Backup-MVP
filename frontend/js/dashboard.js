@@ -137,32 +137,49 @@ function switchListTab(tabName) {
 // 3. 資料獲取與搜尋邏輯 (核心修改區)
 // ==========================================
 
-function refreshFileDashboard() {
+async function refreshFileDashboard() {
     const container = document.getElementById('fileDashboardList');
     if (!container) return;
 
+    // 取得 Token，若無則不執行
+    const idToken = localStorage.getItem('idToken');
+    if (!idToken) return;
+
+    // 取得當前 User Email
     let userEmail = AppState.currentUserEmail || document.getElementById('statusBarEmail')?.innerText;
-    if (!userEmail || !userEmail.includes('@') || userEmail.includes('user@')) return;
-
-    const s3 = new AWS.S3();
-    const userPrefix = `uploads/${userEmail}/`;
     
-    container.innerHTML = '<div class="loading-state">⏳ 讀取個人收藏...</div>';
+    container.innerHTML = '<div class="loading-state">⏳ 讀取檔案與回收筒...</div>';
 
-    s3.listObjectsV2({ Bucket: AWS_CONFIG.s3BucketName, Prefix: userPrefix }, (err, data) => {
-        if (err) {
-            container.innerHTML = `<div class="error-state">Error: ${err.message}</div>`;
-            return;
+    try {
+        // ★ 修改重點：改成 fetch 後端 API (帶上 Authorization Header)
+        const response = await fetch(AWS_CONFIG.filesApiUrl, {
+            method: 'GET',
+            headers: {
+                'Authorization': idToken,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`);
         }
-        const files = data.Contents ? data.Contents.filter(item => 
-            item.Key !== userPrefix && !item.Key.endsWith('_summary.txt')
-        ) : [];
+
+        const data = await response.json();
+        // 相容處理：有些 API 回傳格式是 { files: [] }，有些直接是 []
+        const files = Array.isArray(data) ? data : (data.files || []);
+
         if (files.length === 0) {
             container.innerHTML = '<div class="empty-state-gray">目前沒有資料</div>';
             return;
         }
-        renderUserFileList(files, userPrefix);
-    });
+
+        // 呼叫渲染函式 (傳入 email 以便處理檔名顯示)
+        renderUserFileList(files, userEmail);
+
+    } catch (err) {
+        console.error("Refresh Error:", err);
+        container.innerHTML = `<div class="error-state">無法讀取列表: ${err.message}</div>`;
+    }
 }
 
 function refreshPublicRepository() {
@@ -266,37 +283,93 @@ async function handleCrawlerSearch() {
 // 4. 渲染邏輯
 // ==========================================
 
-function renderUserFileList(files, prefix) {
+function renderUserFileList(files, userEmail) {
     const container = document.getElementById('fileDashboardList');
     if(!container) return;
     container.innerHTML = ''; 
-    files.sort((a, b) => b.LastModified - a.LastModified);
+
+    // ★ 修改排序邏輯：先讓「未刪除」排在前面，接著才是依照日期新舊排序
+    files.sort((a, b) => {
+        // 1. 第一層比較：刪除狀態 (Deleted)
+        // 如果 a 是刪除(true) 而 b 是未刪除(false)，a 應該排在後面 (return 1)
+        // 如果 a 是未刪除(false) 而 b 是刪除(true)，a 應該排在前面 (return -1)
+        if (a.isDeleted !== b.isDeleted) {
+            return a.isDeleted ? 1 : -1;
+        }
+        
+        // 2. 第二層比較：如果狀態一樣，則比較時間 (越新的越前面)
+        return new Date(b.LastModified) - new Date(a.LastModified);
+    });
 
     files.forEach(file => {
-        const fileName = file.Key.replace(prefix, '');
-        const fileSize = formatFileSize(file.Size);
-        const safeKey = file.Key.replace(/'/g, "\\'"); 
-        const icon = getFileIcon(fileName);
+        // ★ 修改重點 2：檔名處理 (移除 uploads/<email>/ 前綴)
+        let displayFileName = file.Key;
+        // 為了安全，這裡做多種可能的路徑檢查
+        if (userEmail && displayFileName.includes(`uploads/${userEmail}/`)) {
+            displayFileName = displayFileName.split(`uploads/${userEmail}/`)[1];
+        } else if (displayFileName.startsWith('uploads/')) {
+            displayFileName = displayFileName.replace('uploads/', '');
+        }
+
+        // 略過系統檔案或空檔名
+        if (!displayFileName || displayFileName.endsWith('_summary.txt')) return;
+
+        const fileSize = file.Size ? formatFileSize(file.Size) : '-';
+        const safeKey = file.Key.replace(/'/g, "\\'");
+        const icon = getFileIcon(displayFileName);
+        
+        // ★ 修改重點 3：解析時間與狀態
+        const dateStr = file.LastModified 
+            ? new Date(file.LastModified).toLocaleString() 
+            : 'Unknown Date';
+
+        const isDeleted = file.isDeleted === true;
+        const versionId = file.VersionId || 'null'; // 還原時需要用到
+
+        // ★ 修改重點 4：根據 isDeleted 決定樣式與按鈕
+        // 狀態標籤
+        const statusTag = isDeleted 
+            ? `<span class="status-tag status-deleted">Deleted</span>` 
+            : `<span class="status-tag status-stored">Stored</span>`;
+
+        // CSS Class (讓整行變淡/刪除線)
+        const rowClass = isDeleted ? 'file-row deleted-row' : 'file-row';
+
+        // 按鈕邏輯 (Deleted 顯示 Restore; 一般顯示原本的操作按鈕)
+        let buttonsHtml = '';
+        if (isDeleted) {
+            // 只有還原按鈕
+            buttonsHtml = `
+                <button class="action-btn restore" title="Restore File" onclick="handleRestore('${safeKey}', '${versionId}')">
+                    ↩ 
+                </button>
+            `;
+        } else {
+            // 一般操作按鈕 (保留原本功能)
+            buttonsHtml = `
+                <button class="action-btn ai-summary" title="AI Summary" style="color: #f59e0b;" onclick="handleViewSummary('${safeKey}')">✨</button>
+                <button class="action-btn publish" title="Publish to Public" style="color: #3b82f6;" onclick="handlePublishToPublic('${safeKey}')">🌍</button>
+                <button class="action-btn download" title="Download" style="color: #10b981;" onclick="handleDownloadFile('${safeKey}')">⬇</button>
+                <button class="action-btn delete" title="Recycle Bin" onclick="handleDeleteFile('${safeKey}')">🗑️</button>
+            `;
+        }
 
         const html = `
-            <div class="file-row" onclick="handleViewFile('${safeKey}')" style="cursor: pointer;">
-                <div class="file-content-top">
+            <div class="${rowClass}">
+                <div class="file-content-top" onclick="handleViewFile('${safeKey}')" style="cursor: pointer;">
                     <div class="file-icon">${icon}</div>
                     <div class="file-info">
-                        <div class="file-title" title="${fileName}">${fileName}</div>
+                        <div class="file-title" title="${displayFileName}">${displayFileName}</div>
                         <div class="file-meta">
-                            <span class="status-tag status-stored">Stored</span>
-                            ${fileSize}
+                            ${statusTag}
+                            <span>${fileSize}</span>
+                            <span style="border-left:1px solid #ddd; padding-left:6px; margin-left:2px;">${dateStr}</span>
                         </div>
                     </div>
                 </div>
                 
                 <div class="file-actions" onclick="event.stopPropagation();">
-                    <button class="action-btn ai-summary" title="AI Summary" style="color: #f59e0b;" onclick="handleViewSummary('${safeKey}')">✨</button>
-                    <button class="action-btn publish" title="Publish to Public" style="color: #3b82f6;" onclick="handlePublishToPublic('${safeKey}')">🌍</button>
-                    <button class="action-btn download" title="Download" style="color: #10b981;" onclick="handleDownloadFile('${safeKey}')">⬇</button>
-                    <button class="action-btn share" title="Share (Dev)" onclick="handleTeamShare('${safeKey}')">➦</button>
-                    <button class="action-btn delete" title="Delete" onclick="handleDeleteFile('${safeKey}')">✕</button>
+                    ${buttonsHtml}
                 </div>
             </div>
         `;
@@ -492,19 +565,73 @@ async function handlePublishToPublic(s3Key) {
 }
 
 async function handleDeleteFile(s3Key) {
-    if (!confirm('永久刪除此檔案？')) return;
-    showToast('🗑️', '正在處理刪除...');
+    if (!confirm('Move this file to Recycle Bin?')) return;
     
-    const s3 = new AWS.S3();
+    showToast('🗑️', 'Processing...');
+    const idToken = localStorage.getItem('idToken');
+    if (!idToken) return;
+
     try {
-        await s3.deleteObject({ Bucket: AWS_CONFIG.s3BucketName, Key: s3Key }).promise();
-        try { await s3.deleteObject({ Bucket: AWS_CONFIG.s3BucketName, Key: s3Key + "_summary.txt" }).promise(); } catch(e){}
-        showToast('✅', '已刪除檔案');
-        refreshFileDashboard();
+        // ★ 修改重點：呼叫 /delete API
+        const response = await fetch(AWS_CONFIG.deleteApiUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': idToken,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ fileName: s3Key })
+        });
+
+        const resData = await response.json();
+
+        if (response.ok) {
+            showToast('✅', 'File moved to Recycle Bin');
+            // 延遲 0.5 秒重新整理，等待後端狀態更新
+            setTimeout(refreshFileDashboard, 500);
+        } else {
+            throw new Error(resData.message || 'Delete failed');
+        }
     } catch (err) {
-        showToast('❌', '刪除失敗');
+        console.error(err);
+        showToast('❌', `Error: ${err.message}`);
     }
 }
+
+async function handleRestore(s3Key, versionId) {
+    if (!confirm('Restore this file?')) return;
+
+    showToast('⏳', 'Restoring file...');
+    const idToken = localStorage.getItem('idToken');
+    if (!idToken) return;
+
+    try {
+        // ★ 新增重點：呼叫 /restore API
+        const response = await fetch(AWS_CONFIG.restoreApiUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': idToken,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                fileName: s3Key,
+                versionId: versionId 
+            })
+        });
+
+        const resData = await response.json();
+
+        if (response.ok) {
+            showToast('✅', 'File restored successfully!');
+            setTimeout(refreshFileDashboard, 500);
+        } else {
+            throw new Error(resData.message || 'Restore failed');
+        }
+    } catch (err) {
+        console.error(err);
+        showToast('❌', `Error: ${err.message}`);
+    }
+}
+
 async function handleDownloadFile(s3Key) {
     showToast('Tn', '準備下載...');
 
@@ -698,4 +825,5 @@ window.handlePublicShare = handlePublicShare;
 window.handleTeamShare = handleTeamShare;
 window.switchListTab = switchListTab;
 window.handleViewFile = handleViewFile;
+window.handleRestore = handleRestore;
 window.handleExternalSummary = handleExternalSummary;

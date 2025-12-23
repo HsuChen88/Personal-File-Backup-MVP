@@ -297,3 +297,36 @@
     font-size: 14px;
     color: #6b7280;
 }
+
+/* ==========================================
+   6. 回收筒與刪除狀態樣式 (新增)
+   ========================================== */
+
+/* 已刪除檔案的列樣式 */
+.file-row.deleted-row {
+    background-color: #f9fafb; /* 較淡的背景 */
+    opacity: 0.75;             /* 讓它看起來像無效 */
+    border-style: dashed;      /* 邊框改虛線 */
+}
+
+/* 讓刪除的檔名有刪除線 */
+.file-row.deleted-row .file-title {
+    text-decoration: line-through;
+    color: #94a3b8;
+}
+
+/* 狀態標籤：已刪除 */
+.status-tag.status-deleted {
+    background: #fef2f2;
+    color: #ef4444;
+    border-color: #fecaca;
+}
+
+/* 還原按鈕樣式 */
+.action-btn.restore {
+    color: #10b981; /* 綠色 */
+    border-color: #10b981;
+}
+.action-btn.restore:hover {
+    background: #ecfdf5;
+}

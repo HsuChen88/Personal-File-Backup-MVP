@@ -10,6 +10,7 @@
     <link rel="apple-touch-icon" href="favicon.png">
 
     <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">  <link rel="stylesheet" href="css/layout.css">
     <link rel="stylesheet" href="css/layout.css">
     <link rel="stylesheet" href="css/auth.css">
     <link rel="stylesheet" href="css/upload.css">
@@ -120,7 +121,7 @@
                             <label class="form-label">Verification Code</label>
                             <input type="text" class="form-input" id="confirmCode" placeholder="Enter code">
                         </div>
-                        <button type="button" class="submit-btn" id="confirmSubmitBtn" onclick="handleConfirmRegistration()">Confirm Account</button>
+                        <button type="button" class="submit-btn" id="confirmSubmitBtn" onclick="handleConfirmRegistration()" style="width: 100%; margin-top: 15px; padding: 12px;">Confirm Account</button>
                         
                         <div style="margin-top: 15px; display: flex; justify-content: space-between;">
                             <button type="button" onclick="resendCode()" style="background: none; border: none; color: #667eea; cursor: pointer; font-size: 13px; font-weight: 600;">Resend Code</button>

@@ -2,22 +2,22 @@
 Transform: AWS::Serverless-2016-10-31
 Description: >
   Dropbex MVP - Full Stack Architecture
-  S3 Storage + Cognito Auth + Python Lambda (Groq AI) + Node.js Lambda (Download)
+  S3 (Versioning) + Cognito + Groq AI + Recycle Bin APIs
 
 # ==========================================
-# 全域設定 (自動處理 CORS)
+# 全域設定
 # ==========================================
 Globals:
   Function:
-    Timeout: 10
-    MemorySize: 128
+    Timeout: 15
+    MemorySize: 256
+    Runtime: nodejs22.x
   Api:
-    # 這裡的設定會自動應用到所有的 API Endpoints
-    # 自動建立 OPTIONS 方法，解決 "No 'Access-Control-Allow-Origin' header" 問題
     Cors:
-      AllowMethods: "'GET,POST,OPTIONS'"
+      AllowMethods: "'GET,POST,OPTIONS,DELETE'"
       AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
       AllowOrigin: "'*'"
+      MaxAge: "'3600'"
 
 Parameters:
   AppName:
@@ -27,16 +27,34 @@ Parameters:
   GroqApiKey:
     Type: String
     NoEcho: true
-    Description: 請輸入您的 Groq API Key (用於 llama-3.1-8b-instant)
+    Description: Groq API Key (用於 Python Lambda)
 
 Resources:
   # ==========================================
-  # 1. S3 儲存桶
+  # 1. API Gateway (統一入口)
+  # ==========================================
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub "${AppName}-Api"
+      StageName: Prod
+      TracingEnabled: true
+
+  # ==========================================
+  # 2. S3 儲存桶 (開啟版本控制)
   # ==========================================
   StorageBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub ${AppName}-storage-${AWS::AccountId}
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: AutoDeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
@@ -46,39 +64,7 @@ Resources:
             MaxAge: 3000
 
   # ==========================================
-  # 2. Lambda - Groq AI 摘要生成器 (Python)
-  # ==========================================
-  SummaryFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: src/SummaryHandler/
-      Handler: summary_handler.lambda_handler 
-      Runtime: python3.11
-      Timeout: 60
-      MemorySize: 256
-      Environment:
-        Variables:
-          GROQ_API_KEY: !Ref GroqApiKey
-      Policies:
-        - S3ReadPolicy:
-            BucketName: !Sub ${AppName}-storage-${AWS::AccountId}
-        - S3WritePolicy:
-            BucketName: !Sub ${AppName}-storage-${AWS::AccountId}
-      Events:
-        FileUploadEvent:
-          Type: S3
-          Properties:
-            Bucket: !Ref StorageBucket
-            Events: s3:ObjectCreated:*
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: uploads/
-                 
-
-  # ==========================================
-  # 3. Cognito - 使用者驗證系統
+  # 3. Cognito 身分驗證
   # ==========================================
   UserPool:
     Type: AWS::Cognito::UserPool
@@ -93,7 +79,7 @@ Resources:
       ClientName: !Sub ${AppName}-client
       UserPoolId: !Ref UserPool
       GenerateSecret: false
-      ExplicitAuthFlows: # 確保支援前端 JS SDK 登入
+      ExplicitAuthFlows:
         - ALLOW_USER_SRP_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
 
@@ -106,9 +92,6 @@ Resources:
         - ClientId: !Ref UserPoolClient
           ProviderName: !GetAtt UserPool.ProviderName
 
-  # ==========================================
-  # 4. IAM Role (前端直接存取 S3 用)
-  # ==========================================
   CognitoAuthRole:
     Type: AWS::IAM::Role
     Properties:
@@ -133,7 +116,8 @@ Resources:
                   - s3:GetObject
                   - s3:ListBucket
                   - s3:DeleteObject
-                Resource: 
+                  - s3:ListBucketVersions
+                Resource:
                   - !Sub arn:aws:s3:::${StorageBucket}
                   - !Sub arn:aws:s3:::${StorageBucket}/*
 
@@ -145,15 +129,41 @@ Resources:
         authenticated: !GetAtt CognitoAuthRole.Arn
 
   # ==========================================
-  # 5. Lambda - 產生 S3 預簽名下載連結 (Node.js)
+  # 4. Lambda Functions
   # ==========================================
+
+  # [原有功能] Groq AI 摘要生成 (Python)
+  SummaryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/SummaryHandler/
+      Handler: summary_handler.lambda_handler
+      Runtime: python3.11
+      Timeout: 60
+      Environment:
+        Variables:
+          GROQ_API_KEY: !Ref GroqApiKey
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Sub ${AppName}-storage-${AWS::AccountId}
+        - S3WritePolicy:
+            BucketName: !Sub ${AppName}-storage-${AWS::AccountId}
+      Events:
+        FileUploadEvent:
+          Type: S3
+          Properties:
+            Bucket: !Ref StorageBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules: [{ Name: prefix, Value: uploads/ }]
+
+  # [原有功能] 下載檔案 API (Node.js)
   DownloadFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/RequestDownloadHandler/ 
+      CodeUri: src/RequestDownloadHandler/
       Handler: index.handler
-      Runtime: nodejs18.x
-      Timeout: 10
       Environment:
         Variables:
           BUCKET_NAME: !Ref StorageBucket
@@ -165,15 +175,87 @@ Resources:
           Type: Api
           Properties:
             Path: /download
-            Method: get
-            # 這裡不需要再手動寫 Proxy，SAM 預設就是 Lambda Proxy Integration
+            Method: GET
+            RestApiId: !Ref Api
 
-# ==========================================
-# 6. 輸出結果 (Outputs)
-# ==========================================
+  # [新增功能] 請求上傳 (Presigned URL)
+  RequestUploadHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/RequestUploadHandler/
+      Handler: index.handler
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref StorageBucket
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: [s3:PutObject, s3:GetObject]
+              Resource: !Sub arn:aws:s3:::${StorageBucket}/*
+      Events:
+        ApiPOSTrequestupload:
+          Type: Api
+          Properties:
+            Path: /request-upload
+            Method: POST
+            RestApiId: !Ref Api
+
+  # [新增功能] 列表 (支援回收筒顯示)
+  ListFilesHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/ListFilesHandler/
+      Handler: index.handler
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref StorageBucket
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: [s3:ListBucket, s3:ListBucketVersions]
+              Resource: !Sub arn:aws:s3:::${StorageBucket}
+      Events:
+        ApiGETfiles:
+          Type: Api
+          Properties:
+            Path: /files
+            Method: GET
+            RestApiId: !Ref Api
+
+  # [新增功能] 刪除與還原 (Delete/Restore)
+  DeleteRestoreHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/DeleteRestoreHandler/
+      Handler: index.handler
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref StorageBucket
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: [s3:DeleteObject, s3:DeleteObjectVersion, s3:ListObjectVersions, s3:GetObject]
+              Resource: !Sub arn:aws:s3:::${StorageBucket}/*
+      Events:
+        ApiPOSTdelete:
+          Type: Api
+          Properties:
+            Path: /delete
+            Method: POST
+            RestApiId: !Ref Api
+        ApiPOSTrestore:
+          Type: Api
+          Properties:
+            Path: /restore
+            Method: POST
+            RestApiId: !Ref Api
+
 Outputs:
   Region:
     Value: !Ref AWS::Region
+  ApiBaseUrl:
+    Description: "API Gateway Endpoint URL"
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/Prod"
   S3BucketName:
     Value: !Ref StorageBucket
   UserPoolId:
@@ -182,11 +264,3 @@ Outputs:
     Value: !Ref UserPoolClient
   IdentityPoolId:
     Value: !Ref IdentityPool
-  # 基礎 API URL
-  ApiBaseUrl:
-    Description: "API Gateway Base URL"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"
-  # 專門給 config.js 用的下載 URL
-  DownloadApiUrl:
-    Description: "Download Endpoint URL (Copy this to config.js)"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/download"
