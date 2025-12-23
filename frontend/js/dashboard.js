@@ -275,6 +275,7 @@ function renderUserFileList(files, prefix) {
     files.forEach(file => {
         const fileName = file.Key.replace(prefix, '');
         const fileSize = formatFileSize(file.Size);
+        // 注意：這裡使用 safeKey 是為了避免引號導致 HTML 錯誤
         const safeKey = file.Key.replace(/'/g, "\\'"); 
         const icon = getFileIcon(fileName);
 
@@ -293,6 +294,9 @@ function renderUserFileList(files, prefix) {
                 
                 <div class="file-actions" onclick="event.stopPropagation();">
                     <button class="action-btn ai-summary" title="AI Summary" style="color: #f59e0b;" onclick="handleViewSummary('${safeKey}')">✨</button>
+                    
+                    <button class="action-btn download" title="Download" style="color: #10b981;" onclick="handleDownloadFile('${safeKey}')">⬇</button>
+
                     <button class="action-btn publish" title="Publish to Public" style="color: #3b82f6;" onclick="handlePublishToPublic('${safeKey}')">🌍</button>
                     <button class="action-btn share" title="Share (Dev)" onclick="handleTeamShare('${safeKey}')">➦</button>
                     <button class="action-btn delete" title="Delete" onclick="handleDeleteFile('${safeKey}')">✕</button>
@@ -506,19 +510,52 @@ async function handleDeleteFile(s3Key) {
 }
 
 async function handleDownloadFile(s3Key) {
-    showToast('⬇️', '下載已開始');
-    const s3 = new AWS.S3();
+    showToast('Tn', '準備下載...');
+
     try {
-        const url = await s3.getSignedUrlPromise('getObject', { 
-            Bucket: AWS_CONFIG.s3BucketName,
-            Key: s3Key, 
-            Expires: 300 
+        if (!AWS_CONFIG.downloadApiUrl) {
+            throw new Error('尚未設定 downloadApiUrl');
+        }
+
+        // 移除 idToken 的讀取，因為我們暫時不帶 Header
+        // const idToken = localStorage.getItem('idToken');
+        
+        const targetUrl = `${AWS_CONFIG.downloadApiUrl}?fileName=${encodeURIComponent(s3Key)}`;
+        console.log("Fetching URL:", targetUrl);
+
+        // ★★★ 修改重點：移除 headers 物件 ★★★
+        // 這樣瀏覽器就不會發送 OPTIONS 預檢請求，而是直接發送 GET
+        const response = await fetch(targetUrl, {
+            method: 'GET' 
+            // ❌ 刪除下面這段 headers
+            // headers: {
+            //     'Content-Type': 'application/json',
+            //     'Authorization': idToken || ''
+            // }
         });
-        const a = document.createElement('a'); a.href = url;
-        a.download = s3Key.split('/').pop();
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+
+        if (!response.ok) {
+            throw new Error(`API 請求失敗: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const downloadUrl = data.downloadUrl;
+
+        if (!downloadUrl) {
+            throw new Error('無法取得下載連結');
+        }
+
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showToast('✅', '下載已開始');
+
     } catch (err) {
-        showToast('❌', '下載失敗');
+        console.error("Download Error:", err);
+        showToast('❌', '下載失敗，請檢查網路或權限');
     }
 }
 

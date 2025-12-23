@@ -2,7 +2,7 @@
 # Node.js / NPM (這是你目前最需要的)
 # ========================
 # 忽略所有資料夾下的 node_modules (包含 src 裡面的)
-
+js/config.js
 test.txt
 test_for_update.png
 test-upload.ps1

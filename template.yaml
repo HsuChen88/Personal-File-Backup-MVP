@@ -2,7 +2,22 @@
 Transform: AWS::Serverless-2016-10-31
 Description: >
   Dropbex MVP - Full Stack Architecture
-  S3 Storage + Cognito Auth + Python Lambda (Groq AI)
+  S3 Storage + Cognito Auth + Python Lambda (Groq AI) + Node.js Lambda (Download)
+
+# ==========================================
+# 全域設定 (自動處理 CORS)
+# ==========================================
+Globals:
+  Function:
+    Timeout: 10
+    MemorySize: 128
+  Api:
+    # 這裡的設定會自動應用到所有的 API Endpoints
+    # 自動建立 OPTIONS 方法，解決 "No 'Access-Control-Allow-Origin' header" 問題
+    Cors:
+      AllowMethods: "'GET,POST,OPTIONS'"
+      AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+      AllowOrigin: "'*'"
 
 Parameters:
   AppName:
@@ -16,12 +31,11 @@ Parameters:
 
 Resources:
   # ==========================================
-  # 1. S3 儲存桶 (儲存個人與公共檔案)
+  # 1. S3 儲存桶
   # ==========================================
   StorageBucket:
     Type: AWS::S3::Bucket
     Properties:
-      # 使用 AccountId 確保名稱在全球 S3 中不重複
       BucketName: !Sub ${AppName}-storage-${AWS::AccountId}
       CorsConfiguration:
         CorsRules:
@@ -37,8 +51,7 @@ Resources:
   SummaryFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: backend/
-      # [已修正] 指向 summary_handler.py 內的 lambda_handler 函數
+      CodeUri: src/SummaryHandler/
       Handler: summary_handler.lambda_handler 
       Runtime: python3.11
       Timeout: 60
@@ -62,6 +75,7 @@ Resources:
                 Rules:
                   - Name: prefix
                     Value: uploads/
+                 
 
   # ==========================================
   # 3. Cognito - 使用者驗證系統
@@ -79,6 +93,9 @@ Resources:
       ClientName: !Sub ${AppName}-client
       UserPoolId: !Ref UserPool
       GenerateSecret: false
+      ExplicitAuthFlows: # 確保支援前端 JS SDK 登入
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
 
   IdentityPool:
     Type: AWS::Cognito::IdentityPool
@@ -90,7 +107,7 @@ Resources:
           ProviderName: !GetAtt UserPool.ProviderName
 
   # ==========================================
-  # 4. IAM Role - 授權前端 JS 直接存取 S3
+  # 4. IAM Role (前端直接存取 S3 用)
   # ==========================================
   CognitoAuthRole:
     Type: AWS::IAM::Role
@@ -127,8 +144,32 @@ Resources:
       Roles:
         authenticated: !GetAtt CognitoAuthRole.Arn
 
+  # ==========================================
+  # 5. Lambda - 產生 S3 預簽名下載連結 (Node.js)
+  # ==========================================
+  DownloadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/RequestDownloadHandler/ 
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Timeout: 10
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref StorageBucket
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Sub ${AppName}-storage-${AWS::AccountId}
+      Events:
+        DownloadApi:
+          Type: Api
+          Properties:
+            Path: /download
+            Method: get
+            # 這裡不需要再手動寫 Proxy，SAM 預設就是 Lambda Proxy Integration
+
 # ==========================================
-# 5. 輸出結果 (部署完後請複製到 js/config.js)
+# 6. 輸出結果 (Outputs)
 # ==========================================
 Outputs:
   Region:
@@ -141,3 +182,11 @@ Outputs:
     Value: !Ref UserPoolClient
   IdentityPoolId:
     Value: !Ref IdentityPool
+  # 基礎 API URL
+  ApiBaseUrl:
+    Description: "API Gateway Base URL"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"
+  # 專門給 config.js 用的下載 URL
+  DownloadApiUrl:
+    Description: "Download Endpoint URL (Copy this to config.js)"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/download"
