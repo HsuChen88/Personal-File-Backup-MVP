@@ -9,6 +9,7 @@ aws-lambda-rie
 # 環境變數與敏感資訊 (包含密鑰與 API 配置)
 # ========================
 .env
+.env.*
 .env.local
 samconfig.toml
 # 前端配置包含 API 網址與 Cognito ID，建議忽略

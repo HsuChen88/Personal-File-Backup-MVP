@@ -330,3 +330,59 @@
 .action-btn.restore:hover {
     background: #ecfdf5;
 }
+
+/* ==========================================
+   7. 列表區域固定高度與滾輪 (新增)
+   ========================================== */
+
+/* 針對 ID 進行設定，確保優先權高於 class */
+#fileDashboardList, 
+#publicFileList {
+    /* 1. 設定列表最大高度 */
+    /* 您可以依據螢幕大小調整此數值，例如 550px 或 60vh */
+    max-height: 600px; 
+    
+    /* 2. 強制開啟垂直捲動 */
+    overflow-y: auto;
+    
+    /* 3. 避免內容緊貼捲軸 */
+    padding-right: 8px;
+    box-sizing: border-box;
+}
+
+/* --- 捲軸美化 (搭配您的藍紫色系) --- */
+
+/* 捲軸整體寬度 */
+#fileDashboardList::-webkit-scrollbar,
+#publicFileList::-webkit-scrollbar {
+    width: 6px;
+}
+
+/* 捲軸軌道 (背景) */
+#fileDashboardList::-webkit-scrollbar-track,
+#publicFileList::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+/* 捲軸本體 (拉桿) */
+#fileDashboardList::-webkit-scrollbar-thumb,
+#publicFileList::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+/* 滑鼠移上去時變深 */
+#fileDashboardList::-webkit-scrollbar-thumb:hover,
+#publicFileList::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* ==========================================
+   新增：還原狀態標籤 (Recover) - 淺藍色
+   ========================================== */
+.status-tag.status-recovered {
+    background: #e0f2fe;  /* 淺藍背景 */
+    color: #0284c7;       /* 深藍文字 */
+    border-color: #bae6fd; /* 藍色邊框 */
+}

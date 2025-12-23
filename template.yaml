@@ -2,7 +2,7 @@
 Transform: AWS::Serverless-2016-10-31
 Description: >
   Dropbex MVP - Full Stack Architecture
-  S3 (Versioning) + Cognito + Groq AI + Recycle Bin APIs
+  S3 (Versioning) + Cognito + Groq AI + Recycle Bin APIs + SNS Notifications + Share
 
 # ==========================================
 # 全域設定
@@ -64,7 +64,7 @@ Resources:
             MaxAge: 3000
 
   # ==========================================
-  # 3. Cognito 身分驗證
+  # 3. Cognito 身分驗證 (包含 IAM Role - 解決 400 錯誤的關鍵)
   # ==========================================
   UserPool:
     Type: AWS::Cognito::UserPool
@@ -92,6 +92,7 @@ Resources:
         - ClientId: !Ref UserPoolClient
           ProviderName: !GetAtt UserPool.ProviderName
 
+  # ⚠️ 這裡保留了 IAM Role，確保登入後能操作 S3
   CognitoAuthRole:
     Type: AWS::IAM::Role
     Properties:
@@ -129,7 +130,7 @@ Resources:
         authenticated: !GetAtt CognitoAuthRole.Arn
 
   # ==========================================
-  # 5. SNS Topic - 通知系統
+  # 4. SNS Topic - 通知系統
   # ==========================================
   NotificationTopic:
     Type: AWS::SNS::Topic
@@ -138,7 +139,7 @@ Resources:
       DisplayName: Dropbex Notifications
 
   # ==========================================
-  # 6. Lambda - 產生 S3 預簽名下載連結 (Node.js)
+  # 5. Lambda Functions (核心檔案功能)
   # ==========================================
 
   # [原有功能] Groq AI 摘要生成 (Python)
@@ -187,7 +188,7 @@ Resources:
             Method: GET
             RestApiId: !Ref Api
 
-  # [新增功能] 請求上傳 (Presigned URL)
+  # [原有功能] 請求上傳 (Presigned URL)
   RequestUploadHandler:
     Type: AWS::Serverless::Function
     Properties:
@@ -209,7 +210,7 @@ Resources:
             Method: POST
             RestApiId: !Ref Api
 
-  # [新增功能] 列表 (支援回收筒顯示)
+  # [原有功能] 列表 (支援回收筒顯示)
   ListFilesHandler:
     Type: AWS::Serverless::Function
     Properties:
@@ -231,7 +232,7 @@ Resources:
             Method: GET
             RestApiId: !Ref Api
 
-  # [新增功能] 刪除與還原 (Delete/Restore)
+  # [原有功能] 刪除與還原 (Delete/Restore)
   DeleteRestoreHandler:
     Type: AWS::Serverless::Function
     Properties:
@@ -259,16 +260,42 @@ Resources:
             Method: POST
             RestApiId: !Ref Api
 
+  # ==========================================
+  # 6. Lambda - 分享與通知功能
+  # ==========================================
 
-  # ==========================================
-  # 7. Lambda - Email 訂閱處理器 (Node.js)
-  # ==========================================
+  # [保留但註解] S3 上傳通知處理器
+  NotifyUploadedFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/NotifyUploadedHandler/
+      Handler: index.handler
+      Timeout: 10
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref NotificationTopic
+          BUCKET_NAME: !Ref StorageBucket
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt NotificationTopic.TopicName
+        - S3ReadPolicy:
+            BucketName: !Sub ${AppName}-storage-${AWS::AccountId}
+      # Events:
+      #   S3UploadEvent:
+      #     Type: S3
+      #     Properties:
+      #       Bucket: !Ref StorageBucket
+      #       Events: s3:ObjectCreated:*
+      #       Filter:
+      #         S3Key:
+      #           Rules: [{ Name: prefix, Value: uploads/ }]
+
+  # Email 訂閱處理器
   SubscribeEmailFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/SubscribeEmailHandler/
       Handler: index.handler
-      Runtime: nodejs18.x
       Timeout: 10
       Environment:
         Variables:
@@ -285,39 +312,38 @@ Resources:
           Properties:
             Path: /subscribe-topic
             Method: post
+            RestApiId: !Ref Api
 
-  # ==========================================
-  # 8. Lambda - 檔案分享通知處理器 (Node.js)
-  # ==========================================
+  # ✨✨✨ [更新] 檔案分享通知處理器 (加入 S3 權限以產生下載連結) ✨✨✨
   ShareFileFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/ShareFileHandler/
       Handler: index.handler
-      Runtime: nodejs18.x
       Timeout: 10
       Environment:
         Variables:
           SNS_TOPIC_ARN: !Ref NotificationTopic
+          BUCKET_NAME: !Ref StorageBucket # [新增] 用於 Presigned URL
       Policies:
         - SNSPublishMessagePolicy:
             TopicName: !GetAtt NotificationTopic.TopicName
+        - S3ReadPolicy: # [新增] 允許讀取 S3 檔案
+            BucketName: !Sub ${AppName}-storage-${AWS::AccountId}
       Events:
         ShareApi:
           Type: Api
           Properties:
             Path: /share
             Method: post
+            RestApiId: !Ref Api
 
-  # ==========================================
-  # 9. Lambda - 檢查 Subscription 狀態 (Node.js)
-  # ==========================================
+  # 檢查 Subscription 狀態
   CheckSubscriptionFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/CheckSubscriptionHandler/
       Handler: index.handler
-      Runtime: nodejs18.x
       Timeout: 10
       Environment:
         Variables:
@@ -334,17 +360,17 @@ Resources:
           Properties:
             Path: /check-subscription
             Method: post
+            RestApiId: !Ref Api
 
-
-# ==========================================
-# 6. 輸出結果 (Outputs)
-# ==========================================
 Outputs:
   Region:
     Value: !Ref AWS::Region
   ApiBaseUrl:
     Description: "API Gateway Endpoint URL"
     Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/Prod"
+  DownloadApiUrl:
+    Description: "Download Endpoint URL"
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/Prod/download"
   S3BucketName:
     Value: !Ref StorageBucket
   UserPoolId:
@@ -353,15 +379,6 @@ Outputs:
     Value: !Ref UserPoolClient
   IdentityPoolId:
     Value: !Ref IdentityPool
-  # 基礎 API URL
-  ApiBaseUrl:
-    Description: "API Gateway Base URL"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"
-  # 專門給 config.js 用的下載 URL
-  DownloadApiUrl:
-    Description: "Download Endpoint URL (Copy this to config.js)"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/download"
-      # SNS Topic ARN
   NotificationTopicArn:
     Description: "SNS Topic ARN for notifications"
     Value: !Ref NotificationTopic

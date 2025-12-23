@@ -6,6 +6,7 @@ exports.handler = async (event) => {
     
     const topicArn = process.env.SNS_TOPIC_ARN;
     
+    // 檢查環境變數
     if (!topicArn) {
         console.error('SNS_TOPIC_ARN environment variable is not set');
         return {
@@ -20,9 +21,11 @@ exports.handler = async (event) => {
         };
     }
     
+    // 修正：將 body 定義在 try 區塊外，確保 catch 區塊也能存取
+    let body = {};
+
     try {
         // 解析請求 body
-        let body;
         try {
             body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body || {};
         } catch (parseError) {
@@ -101,10 +104,12 @@ exports.handler = async (event) => {
         };
         
         return response;
+
     } catch (error) {
         console.error('Error processing email subscription:', error);
         
         // 處理已存在的訂閱錯誤
+        // 這裡現在可以安全地使用 body.email 了
         if (error.name === 'SubscriptionLimitExceeded' || error.message?.includes('already exists')) {
             return {
                 statusCode: 200,
@@ -132,5 +137,3 @@ exports.handler = async (event) => {
         };
     }
 };
-
-
