@@ -467,5 +467,5 @@ sam delete --stack-name dropbex-mvp --region us-east-1
 
 ## 📧 聯絡
 
-如有問題或建議，請透過 Issue 聯繫。
+如有問題或建議，請透過 Issue 聯繫 !
 
