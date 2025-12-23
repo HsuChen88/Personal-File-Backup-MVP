@@ -244,49 +244,179 @@ Write-Host "========================================" -ForegroundColor Cyan
 
 ### 測試 Email 訂閱功能
 
-建立 `test-email-subscribe.ps1`：
+專案中包含以下測試腳本用於測試檔案分享相關功能：
+
+#### 1. test-subscribe.ps1 - 測試 Email 訂閱功能
+
+此腳本測試 `/subscribe-topic` API 端點，將 email 訂閱到 SNS Topic。
+
+**使用方式：**
 
 ```powershell
-# test-email-subscribe.ps1
-param(
-    [string]$ApiUrl = "https://<api-id>.execute-api.us-east-1.amazonaws.com/Prod",
-    [Parameter(Mandatory=$true)]
-    [string]$Email
-)
+# 必須提供 Email 參數
+.\test-subscribe.ps1 -Email "user@example.com"
+```
 
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "Test Email Subscription" -ForegroundColor Cyan
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host ""
+**參數說明：**
 
-Write-Host "Step 1: Subscribing email..." -ForegroundColor Cyan
-try {
-    $requestBody = @{
-        email = $Email
-    } | ConvertTo-Json
-    
-    $response = Invoke-RestMethod `
-        -Uri "$ApiUrl/subscribe-email" `
-        -Method POST `
-        -ContentType "application/json" `
-        -Body $requestBody
-    
-    Write-Host "Success: Email subscription request sent" -ForegroundColor Green
-    Write-Host "Response: $($response | ConvertTo-Json -Depth 5)" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "Note: Check your email for confirmation message" -ForegroundColor Yellow
-} catch {
-    Write-Host "Failed: Cannot subscribe email" -ForegroundColor Red
-    Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
-    exit 1
+| 參數 | 說明 | 是否必填 |
+|------|------|---------|
+| `-Email` | 要訂閱的 email 地址 | ✅ 必填 |
+
+**配置要求：**
+
+以下配置**必須**在 `.env` 檔案中設定：
+
+| 配置項目 | `.env` 變數名稱 | 說明 |
+|---------|---------------|------|
+| API Gateway URL | `API_GATEWAY_URL` 或 `FRONTEND_API_URL` | 必填 |
+| AWS 區域 | `AWS_REGION` | 可選，如果未設定會從 `samconfig.toml` 讀取，最後預設為 `us-east-1` |
+
+**測試流程：**
+
+1. 讀取配置：從 `.env` 檔案讀取 `API_GATEWAY_URL` 和 `AWS_REGION`
+2. 發送訂閱請求：呼叫 `/subscribe-topic` API 端點
+3. 顯示結果：顯示訂閱狀態和後續步驟
+
+**輸出範例：**
+
+```
+========================================
+Test Subscribe Email API
+========================================
+
+Loading configuration from .env...
+Using API Gateway URL from .env: https://shruiq2cre.execute-api.us-east-1.amazonaws.com/Prod
+
+Test Configuration:
+  API Endpoint: https://shruiq2cre.execute-api.us-east-1.amazonaws.com/Prod/subscribe-topic
+  Email: user@example.com
+
+Request Body:
+{
+    "email":  "user@example.com"
 }
+
+Sending subscription request to API...
+
+Success: API request completed successfully!
+
+Response:
+{
+    "message":  "Subscription request sent successfully",
+    "subscriptionArn":  "arn:aws:sns:us-east-1:123456789012:dropbex-mvp-notifications:abc123...",
+    "email":  "user@example.com"
+}
+
+========================================
+Test Complete: Subscription request sent successfully!
+========================================
+
+Next Steps:
+  1. Check the email inbox: user@example.com
+  2. Look for a subscription confirmation email from AWS SNS
+  3. Click the confirmation link in the email to complete the subscription
+  4. After confirmation, the email will receive notifications from the SNS Topic
 ```
 
-使用方式：
+**重要提醒：**
+
+- 訂閱後，收件者會收到一封 SNS 確認信
+- 必須點擊確認連結才能完成訂閱
+- 只有確認後的訂閱才能收到通知
+
+#### 2. test-share-only.ps1 - 測試檔案分享功能
+
+此腳本測試 `/share` API 端點，發送檔案分享通知。
+
+**使用方式：**
 
 ```powershell
-.\test-email-subscribe.ps1 -Email "your-email@example.com"
+# 必須提供所有參數
+.\test-share-only.ps1 -FileName "test.pdf" -RecipientEmail "user@example.com" -CustomMessage "This is a test message"
 ```
+
+**參數說明：**
+
+| 參數 | 說明 | 是否必填 |
+|------|------|---------|
+| `-FileName` | 要分享的檔案名稱 | ✅ 必填 |
+| `-RecipientEmail` | 收件者 email 地址 | ✅ 必填 |
+| `-CustomMessage` | 自訂訊息內容 | ✅ 必填 |
+
+**配置要求：**
+
+以下配置**必須**在 `.env` 檔案中設定：
+
+| 配置項目 | `.env` 變數名稱 | 說明 |
+|---------|---------------|------|
+| API Gateway URL | `API_GATEWAY_URL` 或 `FRONTEND_API_URL` | 必填 |
+| AWS 區域 | `AWS_REGION` | 可選，如果未設定會從 `samconfig.toml` 讀取，最後預設為 `us-east-1` |
+
+**測試流程：**
+
+1. 讀取配置：從 `.env` 檔案讀取 `API_GATEWAY_URL` 和 `AWS_REGION`
+2. 發送分享請求：呼叫 `/share` API 端點
+3. 顯示結果：顯示分享狀態
+
+**輸出範例：**
+
+```
+========================================
+Test Share File API (Share Only)
+========================================
+
+Loading configuration from .env...
+Using API Gateway URL from .env: https://shruiq2cre.execute-api.us-east-1.amazonaws.com/Prod
+
+Test Configuration:
+  API Endpoint: https://shruiq2cre.execute-api.us-east-1.amazonaws.com/Prod/share
+  File Name: test.pdf
+  Recipient Email: user@example.com
+  Custom Message: This is a test message
+
+Request Body:
+{
+    "fileName":  "test.pdf",
+    "recipientEmail":  "user@example.com",
+    "customMessage":  "This is a test message"
+}
+
+Sending share file request to API...
+
+Success: API request completed successfully!
+
+Response:
+{
+    "message":  "File share notification sent successfully",
+    "messageId":  "1be6e8ac-f44e-5031-90a6-896ed0258273",
+    "fileName":  "test.pdf",
+    "recipientEmail":  "user@example.com"
+}
+
+========================================
+Test Complete: Share request sent successfully!
+========================================
+
+Next Steps:
+  1. Check the recipient email inbox: user@example.com
+  2. Verify the email contains:
+     - File name: test.pdf
+     - Custom message: This is a test message
+```
+
+**重要提醒：**
+
+- 收件者必須已經訂閱 SNS Topic 才能收到通知
+- 如果收件者尚未訂閱，請先使用 `test-subscribe.ps1` 進行訂閱
+- 訂閱後需要確認 email 才能收到通知
+
+#### 3. 測試腳本比較
+
+| 腳本 | 功能 | 參數要求 | 使用場景 |
+|------|------|---------|---------|
+| `test-subscribe.ps1` | 只測試訂閱功能 | 必須提供 `-Email` | 單獨測試 email 訂閱 |
+| `test-share-only.ps1` | 只測試分享功能 | 必須提供 `-FileName`, `-RecipientEmail`, `-CustomMessage` | 單獨測試檔案分享 |
 
 ### 批次測試腳本
 
@@ -401,6 +531,9 @@ const AWS_CONFIG = {
 - [ ] 確認所有資源已建立（CloudFormation Console）
 - [ ] 取得 API Gateway URL
 - [ ] 測試 `/request-upload` 端點
+- [ ] 測試 `/download` 端點
+- [ ] 測試 `/subscribe-topic` 端點（使用 `test-subscribe.ps1`）
+- [ ] 測試 `/share` 端點（使用 `test-share-only.ps1`）
 - [ ] 使用 `test-upload.ps1` 測試 S3 上傳功能
 - [ ] 確認檔案已上傳到 S3
 - [ ] 檢查 `NotifyUploadedHandler` 日誌，確認 S3 Event 已觸發
@@ -441,27 +574,33 @@ aws logs tail /aws/lambda/dropbex-mvp-RequestUploadHandler --follow --region us-
 
 1. **API Gateway** (`Api`)
    - 端點：`/request-upload` (POST)
-   - 端點：`/subscribe-email` (POST)
+   - 端點：`/download` (GET)
+   - 端點：`/subscribe-topic` (POST) - 訂閱 email 到 SNS Topic
+   - 端點：`/share` (POST) - 發送檔案分享通知
    - **注意**：`/notify-uploaded` 已移除，改由 S3 Event 自動觸發
 
 2. **Lambda Functions**
    - `RequestUploadHandler`：處理上傳請求，產生預簽名 URL
+   - `DownloadFunction`：產生 S3 預簽名下載連結
    - `NotifyUploadedHandler`：由 S3 Event 觸發，驗證檔案存在後發送 SNS 通知
-   - `SubscribeEmailHandler`：處理 Email 訂閱請求
+   - `SubscribeEmailFunction`：處理 Email 訂閱請求到 SNS Topic
+   - `ShareFileFunction`：處理檔案分享通知，發送通知到 SNS Topic
 
 3. **S3 Bucket** (`Bucket`)
    - 名稱：`dropbex-mvp-bucket-<AccountId>`
    - 用於儲存上傳的檔案
    - **Event Notification**：自動觸發 `NotifyUploadedHandler` 當檔案上傳時
 
-4. **SNS Topic** (`Topic`)
+4. **SNS Topic** (`NotificationTopic`)
    - 用於發送通知
-   - 訂閱者會收到檔案上傳通知
+   - 訂閱者會收到檔案上傳和檔案分享通知
 
 5. **CloudWatch Log Groups**
    - `/aws/lambda/dropbex-mvp-RequestUploadHandler`（保留 30 天）
+   - `/aws/lambda/dropbex-mvp-DownloadFunction`（保留 30 天）
    - `/aws/lambda/dropbex-mvp-NotifyUploadedHandler`（保留 30 天）
-   - `/aws/lambda/dropbex-mvp-SubscribeEmailHandler`（保留 30 天）
+   - `/aws/lambda/dropbex-mvp-SubscribeEmailFunction`（保留 30 天）
+   - `/aws/lambda/dropbex-mvp-ShareFileFunction`（保留 30 天）
 
 ## 🔄 新的上傳流程
 
