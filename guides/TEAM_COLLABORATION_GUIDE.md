@@ -132,12 +132,6 @@ FRONTEND_API_URL=https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/Prod
 
 如果使用前端功能：
 
-**Windows Batch (推薦)**：
-```cmd
-.\build-frontend-config.bat
-```
-
-**PowerShell (備用)**：
 ```powershell
 .\build-frontend-config.ps1
 ```

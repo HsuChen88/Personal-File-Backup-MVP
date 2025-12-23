@@ -40,8 +40,6 @@ function checkCurrentSession() {
         }
     } else {
         console.log("ℹ️ No active session found.");
-        // 確保停留在登入畫面
-        switchToLoginLayout();
     }
 }
 
@@ -280,10 +278,8 @@ function handleLogout() {
         console.log("✅ AppState Reset: User Logged Out");
     }
 
-    // 4. 重置 UI (呼叫新的切換函式)
+    // 4. 重置 UI
     switchToLoginLayout();
-
-    // 5. 重置表單
     const loginForm = document.getElementById('loginForm');
     const registerForm = document.getElementById('registerForm');
     if (loginForm) loginForm.reset();
@@ -339,27 +335,28 @@ function switchTab(tab) {
 }
 
 /**
- * [關鍵修改] 切換至「已登入」佈局
- * 現在會呼叫 ui.js 的 showDashboard() 來確保 Header 按鈕顯示
+ * 切換至「已登入」佈局 (顯示 Dashboard)
  */
 function switchToLoggedInLayout(email) {
-    // 1. 更新 Header 上的使用者 Email (在 headerUserSection 裡面)
+    // 隱藏登入區塊
+    const authCard = document.getElementById('authCard');
+    if (authCard) authCard.style.display = 'none';
+    
+    const beforeLoginCard = document.getElementById('uploadCardBeforeLogin');
+    if (beforeLoginCard) beforeLoginCard.style.display = 'none';
+    
+    // 顯示頂部狀態列
+    const statusBar = document.getElementById('statusBar');
+    if (statusBar) statusBar.classList.add('visible');
+    
     const emailSpan = document.getElementById('statusBarEmail');
     if (emailSpan) emailSpan.textContent = email;
     
-    // 2. 呼叫 UI 模組的切換函式 (這會顯示 mainGrid 並隱藏 authGrid，同時顯示 Header Logout)
-    if (typeof showDashboard === 'function') {
-        showDashboard();
-    } else {
-        console.warn("⚠️ ui.js seems outdated. Using fallback display logic.");
-        // Fallback: 如果 ui.js 沒載入成功，至少手動切換基本的
-        document.getElementById('mainGrid').style.display = 'none';
-        document.getElementById('loggedInGrid').style.display = 'grid';
-        const headerUser = document.getElementById('headerUserSection');
-        if(headerUser) headerUser.style.display = 'flex';
-    }
+    // 顯示主 Dashboard Grid
+    const loggedInGrid = document.getElementById('loggedInGrid');
+    if (loggedInGrid) loggedInGrid.classList.add('visible');
     
-    // 3. 確保 AppState 同步
+    // 確保 AppState 同步
     if (typeof AppState !== 'undefined') {
         if (typeof AppState.setLoggedIn === 'function') {
             if (!AppState.isLoggedIn) AppState.setLoggedIn(true, email);
@@ -369,27 +366,27 @@ function switchToLoggedInLayout(email) {
         }
     }
 
-    // 4. 呼叫 Dashboard 統一入口 (刷新檔案列表)
+    // 呼叫 Dashboard 統一入口 (dashboard.js)
     if (typeof window.refreshAllDashboards === 'function') {
         window.refreshAllDashboards();
     } else if (typeof renderFileDashboard === 'function') {
-        renderFileDashboard(); 
+        renderFileDashboard(); // 舊版相容
     }
 }
 
 /**
- * [關鍵修改] 切換至「未登入」佈局
- * 現在會呼叫 ui.js 的 showAuth() 來隱藏 Header 按鈕
+ * 切換至「未登入」佈局 (顯示登入框)
  */
 function switchToLoginLayout() {
-    // 呼叫 UI 模組的切換函式 (這會隱藏 Header Logout)
-    if (typeof showAuth === 'function') {
-        showAuth();
-    } else {
-        console.warn("⚠️ ui.js seems outdated. Using fallback display logic.");
-        document.getElementById('mainGrid').style.display = 'block';
-        document.getElementById('loggedInGrid').style.display = 'none';
-        const headerUser = document.getElementById('headerUserSection');
-        if(headerUser) headerUser.style.display = 'none';
-    }
+    const authCard = document.getElementById('authCard');
+    if (authCard) authCard.style.display = 'block';
+    
+    const beforeLoginCard = document.getElementById('uploadCardBeforeLogin');
+    if (beforeLoginCard) beforeLoginCard.style.display = 'block';
+    
+    const statusBar = document.getElementById('statusBar');
+    if (statusBar) statusBar.classList.remove('visible');
+    
+    const loggedInGrid = document.getElementById('loggedInGrid');
+    if (loggedInGrid) loggedInGrid.classList.remove('visible');
 }

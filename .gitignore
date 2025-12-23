@@ -8,20 +8,10 @@ test_for_update.png
 test-upload.ps1
 
 node_modules/
-# 忽略 npm debug log
-npm-debug.log
-yarn-error.log
-
-# ========================
-# AWS SAM
-# ========================
-.aws-sam/
-# 注意：samconfig.toml 應該提交到版本控制，因為它包含團隊共用的部署設定
-
-# ========================
-# Python
-# ========================
 __pycache__/
+samconfig.toml
+frontend/js/config.js
+.history/
 *.py[cod]
 *$py.class
 *.so
